@@ -1,5 +1,5 @@
 // ComfyUI Image Manager - Bundled Backend
-// Generated: 2025-10-12T11:38:41.324Z
+// Generated: 2025-10-12T12:25:47.808Z
 // Node.js v22.17.1
 
 "use strict";
@@ -51210,55 +51210,24 @@ var require_migrationManager = __commonJS({
         this.db = database;
         this.migrationsPath = path_12.default.join(__dirname, "migrations");
       }
-      async createMigrationsTable() {
-        return new Promise((resolve, reject) => {
-          this.db.run(`
-        CREATE TABLE IF NOT EXISTS migrations (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          version VARCHAR(255) NOT NULL UNIQUE,
-          applied_date DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `, (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-        });
+      createMigrationsTable() {
+        this.db.exec(`
+      CREATE TABLE IF NOT EXISTS migrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        version VARCHAR(255) NOT NULL UNIQUE,
+        applied_date DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
       }
-      async getAppliedMigrations() {
-        return new Promise((resolve, reject) => {
-          this.db.all("SELECT version FROM migrations ORDER BY version", (err, rows) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(rows.map((row) => row.version));
-            }
-          });
-        });
+      getAppliedMigrations() {
+        const rows = this.db.prepare("SELECT version FROM migrations ORDER BY version").all();
+        return rows.map((row) => row.version);
       }
-      async recordMigration(version) {
-        return new Promise((resolve, reject) => {
-          this.db.run("INSERT INTO migrations (version) VALUES (?)", [version], (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-        });
+      recordMigration(version) {
+        this.db.prepare("INSERT INTO migrations (version) VALUES (?)").run(version);
       }
-      async removeMigrationRecord(version) {
-        return new Promise((resolve, reject) => {
-          this.db.run("DELETE FROM migrations WHERE version = ?", [version], (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-        });
+      removeMigrationRecord(version) {
+        this.db.prepare("DELETE FROM migrations WHERE version = ?").run(version);
       }
       async getAvailableMigrations() {
         const migrations = [];
@@ -51301,8 +51270,8 @@ var require_migrationManager = __commonJS({
       }
       async migrate() {
         try {
-          await this.createMigrationsTable();
-          const appliedMigrations = await this.getAppliedMigrations();
+          this.createMigrationsTable();
+          const appliedMigrations = this.getAppliedMigrations();
           const availableMigrations = await this.getAvailableMigrations();
           const pendingMigrations = availableMigrations.filter((migration) => !appliedMigrations.includes(migration.version));
           if (pendingMigrations.length === 0) {
@@ -51314,7 +51283,7 @@ var require_migrationManager = __commonJS({
             try {
               console.log(`\u{1F4E6} \uB9C8\uC774\uADF8\uB808\uC774\uC158 \uC801\uC6A9 \uC911: ${migration.version}`);
               await migration.up(this.db);
-              await this.recordMigration(migration.version);
+              this.recordMigration(migration.version);
               console.log(`\u2705 \uB9C8\uC774\uADF8\uB808\uC774\uC158 \uC644\uB8CC: ${migration.version}`);
             } catch (error) {
               console.error(`\u274C \uB9C8\uC774\uADF8\uB808\uC774\uC158 \uC2E4\uD328: ${migration.version}`, error);
@@ -51329,8 +51298,8 @@ var require_migrationManager = __commonJS({
       }
       async rollback(targetVersion) {
         try {
-          await this.createMigrationsTable();
-          const appliedMigrations = await this.getAppliedMigrations();
+          this.createMigrationsTable();
+          const appliedMigrations = this.getAppliedMigrations();
           const availableMigrations = await this.getAvailableMigrations();
           if (appliedMigrations.length === 0) {
             console.log("\u2705 \uB864\uBC31\uD560 \uB9C8\uC774\uADF8\uB808\uC774\uC158\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
@@ -51356,7 +51325,7 @@ var require_migrationManager = __commonJS({
             try {
               console.log(`\u{1F4E6} \uB9C8\uC774\uADF8\uB808\uC774\uC158 \uB864\uBC31 \uC911: ${version}`);
               await migration.down(this.db);
-              await this.removeMigrationRecord(version);
+              this.removeMigrationRecord(version);
               console.log(`\u2705 \uB9C8\uC774\uADF8\uB808\uC774\uC158 \uB864\uBC31 \uC644\uB8CC: ${version}`);
             } catch (error) {
               console.error(`\u274C \uB9C8\uC774\uADF8\uB808\uC774\uC158 \uB864\uBC31 \uC2E4\uD328: ${version}`, error);
@@ -51371,8 +51340,8 @@ var require_migrationManager = __commonJS({
       }
       async status() {
         try {
-          await this.createMigrationsTable();
-          const appliedMigrations = await this.getAppliedMigrations();
+          this.createMigrationsTable();
+          const appliedMigrations = this.getAppliedMigrations();
           const availableMigrations = await this.getAvailableMigrations();
           console.log("\n\u{1F4CA} \uB9C8\uC774\uADF8\uB808\uC774\uC158 \uC0C1\uD0DC:");
           console.log("=".repeat(50));
@@ -51407,7 +51376,7 @@ var require_init2 = __commonJS({
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.closeDatabase = exports2.initializeDatabase = exports2.migrationManager = exports2.db = void 0;
-    var sqlite3_1 = __importDefault2(require("sqlite3"));
+    var better_sqlite3_1 = __importDefault2(require("better-sqlite3"));
     var fs_12 = __importDefault2(require("fs"));
     var migrationManager_1 = require_migrationManager();
     var runtimePaths_12 = require_runtimePaths();
@@ -51416,7 +51385,7 @@ var require_init2 = __commonJS({
     if (!fs_12.default.existsSync(dbDir)) {
       fs_12.default.mkdirSync(dbDir, { recursive: true });
     }
-    exports2.db = new sqlite3_1.default.Database(DB_PATH);
+    exports2.db = new better_sqlite3_1.default(DB_PATH);
     exports2.migrationManager = new migrationManager_1.MigrationManager(exports2.db);
     var initializeDatabase = async () => {
       try {
@@ -51426,136 +51395,94 @@ var require_init2 = __commonJS({
         } else {
           console.log("\u2705 \uAE30\uC874 \uB370\uC774\uD130\uBCA0\uC774\uC2A4\uC5D0 \uC5F0\uACB0\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
         }
-        await new Promise((resolve, reject) => {
-          exports2.db.serialize(() => {
-            exports2.db.run(`
-          CREATE TABLE IF NOT EXISTS images (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename VARCHAR(255) NOT NULL,
-            original_name VARCHAR(255) NOT NULL,
-            file_path VARCHAR(500) NOT NULL,
-            thumbnail_path VARCHAR(500) NOT NULL,
-            file_size INTEGER NOT NULL,
-            mime_type VARCHAR(100) NOT NULL,
-            width INTEGER,
-            height INTEGER,
-            upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-            metadata TEXT,
-            UNIQUE(file_path)
-          )
-        `, (err) => {
-              if (err) {
-                console.error("\u274C Error creating images table:", err);
-                reject(err);
-                return;
-              }
-              console.log("\u2705 Images \uD14C\uC774\uBE14\uC774 \uC900\uBE44\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
-            });
-            exports2.db.run(`
-          CREATE TABLE IF NOT EXISTS prompt_collection (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            prompt TEXT NOT NULL,
-            usage_count INTEGER DEFAULT 1,
-            group_id INTEGER,
-            synonyms TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(prompt)
-          )
-        `, (err) => {
-              if (err) {
-                console.error("\u274C Error creating prompt_collection table:", err);
-                reject(err);
-                return;
-              }
-              console.log("\u2705 Prompt Collection \uD14C\uC774\uBE14\uC774 \uC900\uBE44\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
-            });
-            exports2.db.run(`
-          CREATE TABLE IF NOT EXISTS negative_prompt_collection (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            prompt TEXT NOT NULL,
-            usage_count INTEGER DEFAULT 1,
-            group_id INTEGER,
-            synonyms TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(prompt)
-          )
-        `, (err) => {
-              if (err) {
-                console.error("\u274C Error creating negative_prompt_collection table:", err);
-                reject(err);
-                return;
-              }
-              console.log("\u2705 Negative Prompt Collection \uD14C\uC774\uBE14\uC774 \uC900\uBE44\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
-            });
-            exports2.db.run(`
-          CREATE TABLE IF NOT EXISTS prompt_groups (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            group_name TEXT NOT NULL,
-            display_order INTEGER NOT NULL DEFAULT 0,
-            is_visible BOOLEAN DEFAULT 1,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(group_name)
-          )
-        `, (err) => {
-              if (err) {
-                console.error("\u274C Error creating prompt_groups table:", err);
-                reject(err);
-                return;
-              }
-              console.log("\u2705 Prompt Groups \uD14C\uC774\uBE14\uC774 \uC900\uBE44\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
-            });
-            exports2.db.run(`
-          CREATE TABLE IF NOT EXISTS negative_prompt_groups (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            group_name TEXT NOT NULL,
-            display_order INTEGER NOT NULL DEFAULT 0,
-            is_visible BOOLEAN DEFAULT 1,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(group_name)
-          )
-        `, (err) => {
-              if (err) {
-                console.error("\u274C Error creating negative_prompt_groups table:", err);
-                reject(err);
-                return;
-              }
-              console.log("\u2705 Negative Prompt Groups \uD14C\uC774\uBE14\uC774 \uC900\uBE44\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
-            });
-            const indexes = [
-              { name: "idx_upload_date", column: "upload_date" },
-              { name: "idx_filename", column: "filename" },
-              { name: "idx_mime_type", column: "mime_type" },
-              { name: "idx_prompt_usage", table: "prompt_collection", column: "usage_count" },
-              { name: "idx_prompt_group", table: "prompt_collection", column: "group_id" },
-              { name: "idx_negative_prompt_usage", table: "negative_prompt_collection", column: "usage_count" },
-              { name: "idx_negative_prompt_group", table: "negative_prompt_collection", column: "group_id" },
-              { name: "idx_prompt_groups_order", table: "prompt_groups", column: "display_order" },
-              { name: "idx_prompt_groups_visible", table: "prompt_groups", column: "is_visible" },
-              { name: "idx_negative_groups_order", table: "negative_prompt_groups", column: "display_order" },
-              { name: "idx_negative_groups_visible", table: "negative_prompt_groups", column: "is_visible" }
-            ];
-            let indexCount = 0;
-            indexes.forEach((index) => {
-              const tableName = index.table || "images";
-              exports2.db.run(`
-            CREATE INDEX IF NOT EXISTS ${index.name} ON ${tableName}(${index.column})
-          `, (err) => {
-                indexCount++;
-                if (err) {
-                  console.warn(`\u26A0\uFE0F  Warning creating index ${index.name}:`, err);
-                }
-                if (indexCount === indexes.length) {
-                  console.log("\u2705 \uAE30\uBCF8 \uB370\uC774\uD130\uBCA0\uC774\uC2A4 \uC778\uB371\uC2A4\uAC00 \uC124\uC815\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
-                  resolve();
-                }
-              });
-            });
-          });
+        exports2.db.exec(`
+      CREATE TABLE IF NOT EXISTS images (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        filename VARCHAR(255) NOT NULL,
+        original_name VARCHAR(255) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        thumbnail_path VARCHAR(500) NOT NULL,
+        file_size INTEGER NOT NULL,
+        mime_type VARCHAR(100) NOT NULL,
+        width INTEGER,
+        height INTEGER,
+        upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        metadata TEXT,
+        UNIQUE(file_path)
+      )
+    `);
+        console.log("\u2705 Images \uD14C\uC774\uBE14\uC774 \uC900\uBE44\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
+        exports2.db.exec(`
+      CREATE TABLE IF NOT EXISTS prompt_collection (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        prompt TEXT NOT NULL,
+        usage_count INTEGER DEFAULT 1,
+        group_id INTEGER,
+        synonyms TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(prompt)
+      )
+    `);
+        console.log("\u2705 Prompt Collection \uD14C\uC774\uBE14\uC774 \uC900\uBE44\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
+        exports2.db.exec(`
+      CREATE TABLE IF NOT EXISTS negative_prompt_collection (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        prompt TEXT NOT NULL,
+        usage_count INTEGER DEFAULT 1,
+        group_id INTEGER,
+        synonyms TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(prompt)
+      )
+    `);
+        console.log("\u2705 Negative Prompt Collection \uD14C\uC774\uBE14\uC774 \uC900\uBE44\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
+        exports2.db.exec(`
+      CREATE TABLE IF NOT EXISTS prompt_groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_name TEXT NOT NULL,
+        display_order INTEGER NOT NULL DEFAULT 0,
+        is_visible BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(group_name)
+      )
+    `);
+        console.log("\u2705 Prompt Groups \uD14C\uC774\uBE14\uC774 \uC900\uBE44\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
+        exports2.db.exec(`
+      CREATE TABLE IF NOT EXISTS negative_prompt_groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        group_name TEXT NOT NULL,
+        display_order INTEGER NOT NULL DEFAULT 0,
+        is_visible BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(group_name)
+      )
+    `);
+        console.log("\u2705 Negative Prompt Groups \uD14C\uC774\uBE14\uC774 \uC900\uBE44\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
+        const indexes = [
+          { name: "idx_upload_date", table: "images", column: "upload_date" },
+          { name: "idx_filename", table: "images", column: "filename" },
+          { name: "idx_mime_type", table: "images", column: "mime_type" },
+          { name: "idx_prompt_usage", table: "prompt_collection", column: "usage_count" },
+          { name: "idx_prompt_group", table: "prompt_collection", column: "group_id" },
+          { name: "idx_negative_prompt_usage", table: "negative_prompt_collection", column: "usage_count" },
+          { name: "idx_negative_prompt_group", table: "negative_prompt_collection", column: "group_id" },
+          { name: "idx_prompt_groups_order", table: "prompt_groups", column: "display_order" },
+          { name: "idx_prompt_groups_visible", table: "prompt_groups", column: "is_visible" },
+          { name: "idx_negative_groups_order", table: "negative_prompt_groups", column: "display_order" },
+          { name: "idx_negative_groups_visible", table: "negative_prompt_groups", column: "is_visible" }
+        ];
+        indexes.forEach((index) => {
+          try {
+            exports2.db.exec(`CREATE INDEX IF NOT EXISTS ${index.name} ON ${index.table}(${index.column})`);
+          } catch (err) {
+            console.warn(`\u26A0\uFE0F  Warning creating index ${index.name}:`, err);
+          }
         });
+        console.log("\u2705 \uAE30\uBCF8 \uB370\uC774\uD130\uBCA0\uC774\uC2A4 \uC778\uB371\uC2A4\uAC00 \uC124\uC815\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
         console.log("\u{1F504} \uB9C8\uC774\uADF8\uB808\uC774\uC158\uC744 \uD655\uC778\uD569\uB2C8\uB2E4...");
         await exports2.migrationManager.migrate();
         console.log("\u{1F389} \uB370\uC774\uD130\uBCA0\uC774\uC2A4 \uCD08\uAE30\uD654\uAC00 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4!");
@@ -51566,15 +51493,7 @@ var require_init2 = __commonJS({
     };
     exports2.initializeDatabase = initializeDatabase;
     var closeDatabase = () => {
-      return new Promise((resolve, reject) => {
-        exports2.db.close((err) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve();
-          }
-        });
-      });
+      exports2.db.close();
     };
     exports2.closeDatabase = closeDatabase;
   }
@@ -51588,140 +51507,56 @@ var require_ImageModel = __commonJS({
     exports2.ImageModel = void 0;
     var init_12 = require_init2();
     var ImageModel = class {
-      static create(imageData) {
-        return new Promise((resolve, reject) => {
-          const stmt = init_12.db.prepare(`
-        INSERT INTO images (
-          filename, original_name, file_path, thumbnail_path, optimized_path,
-          file_size, mime_type, width, height, metadata,
-          ai_tool, model_name, lora_models, steps, cfg_scale, sampler, seed, scheduler,
-          prompt, negative_prompt, denoise_strength, generation_time, batch_size, batch_index
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-          stmt.run([
-            imageData.filename,
-            imageData.original_name,
-            imageData.file_path,
-            imageData.thumbnail_path,
-            imageData.optimized_path,
-            imageData.file_size,
-            imageData.mime_type,
-            imageData.width,
-            imageData.height,
-            imageData.metadata,
-            imageData.ai_tool,
-            imageData.model_name,
-            imageData.lora_models,
-            imageData.steps,
-            imageData.cfg_scale,
-            imageData.sampler,
-            imageData.seed,
-            imageData.scheduler,
-            imageData.prompt,
-            imageData.negative_prompt,
-            imageData.denoise_strength,
-            imageData.generation_time,
-            imageData.batch_size,
-            imageData.batch_index
-          ], function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.lastID);
-            }
-          });
-          stmt.finalize();
-        });
+      static async create(imageData) {
+        const info = init_12.db.prepare(`
+      INSERT INTO images (
+        filename, original_name, file_path, thumbnail_path, optimized_path,
+        file_size, mime_type, width, height, metadata,
+        ai_tool, model_name, lora_models, steps, cfg_scale, sampler, seed, scheduler,
+        prompt, negative_prompt, denoise_strength, generation_time, batch_size, batch_index
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(imageData.filename, imageData.original_name, imageData.file_path, imageData.thumbnail_path, imageData.optimized_path, imageData.file_size, imageData.mime_type, imageData.width, imageData.height, imageData.metadata, imageData.ai_tool, imageData.model_name, imageData.lora_models, imageData.steps, imageData.cfg_scale, imageData.sampler, imageData.seed, imageData.scheduler, imageData.prompt, imageData.negative_prompt, imageData.denoise_strength, imageData.generation_time, imageData.batch_size, imageData.batch_index);
+        return info.lastInsertRowid;
       }
-      static findById(id) {
-        return new Promise((resolve, reject) => {
-          init_12.db.get("SELECT * FROM images WHERE id = ?", [id], (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row || null);
-            }
-          });
-        });
+      static async findById(id) {
+        const row = init_12.db.prepare("SELECT * FROM images WHERE id = ?").get(id);
+        return row || null;
       }
-      static findAll(page = 1, limit = 20, sortBy = "upload_date", sortOrder = "DESC") {
-        return new Promise((resolve, reject) => {
-          const offset = (page - 1) * limit;
-          init_12.db.get("SELECT COUNT(*) as total FROM images", (err, countRow) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            const total = countRow.total;
-            init_12.db.all(`SELECT * FROM images ORDER BY ${sortBy} ${sortOrder} LIMIT ? OFFSET ?`, [limit, offset], (err2, rows) => {
-              if (err2) {
-                reject(err2);
-              } else {
-                resolve({ images: rows || [], total });
-              }
-            });
-          });
-        });
+      static async findAll(page = 1, limit = 20, sortBy = "upload_date", sortOrder = "DESC") {
+        const offset = (page - 1) * limit;
+        const countRow = init_12.db.prepare("SELECT COUNT(*) as total FROM images").get();
+        const total = countRow.total;
+        const rows = init_12.db.prepare(`SELECT * FROM images ORDER BY ${sortBy} ${sortOrder} LIMIT ? OFFSET ?`).all(limit, offset);
+        return { images: rows || [], total };
       }
-      static findByDateRange(startDate, endDate, page = 1, limit = 20) {
-        return new Promise((resolve, reject) => {
-          const offset = (page - 1) * limit;
-          init_12.db.get("SELECT COUNT(*) as total FROM images WHERE upload_date BETWEEN ? AND ?", [startDate, endDate], (err, countRow) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            const total = countRow.total;
-            init_12.db.all(`SELECT * FROM images
-             WHERE upload_date BETWEEN ? AND ?
-             ORDER BY upload_date DESC
-             LIMIT ? OFFSET ?`, [startDate, endDate, limit, offset], (err2, rows) => {
-              if (err2) {
-                reject(err2);
-              } else {
-                resolve({ images: rows || [], total });
-              }
-            });
-          });
-        });
+      static async findByDateRange(startDate, endDate, page = 1, limit = 20) {
+        const offset = (page - 1) * limit;
+        const countRow = init_12.db.prepare("SELECT COUNT(*) as total FROM images WHERE upload_date BETWEEN ? AND ?").get(startDate, endDate);
+        const total = countRow.total;
+        const rows = init_12.db.prepare(`
+      SELECT * FROM images
+      WHERE upload_date BETWEEN ? AND ?
+      ORDER BY upload_date DESC
+      LIMIT ? OFFSET ?
+    `).all(startDate, endDate, limit, offset);
+        return { images: rows || [], total };
       }
-      static delete(id) {
-        return new Promise((resolve, reject) => {
-          init_12.db.run("DELETE FROM image_groups WHERE image_id = ?", [id], (err) => {
-            if (err) {
-              console.warn("Warning: Failed to remove image from groups:", err);
-            }
-            init_12.db.run("DELETE FROM images WHERE id = ?", [id], function(err2) {
-              if (err2) {
-                reject(err2);
-              } else {
-                resolve(this.changes > 0);
-              }
-            });
-          });
-        });
+      static async delete(id) {
+        try {
+          init_12.db.prepare("DELETE FROM image_groups WHERE image_id = ?").run(id);
+        } catch (err) {
+          console.warn("Warning: Failed to remove image from groups:", err);
+        }
+        const info = init_12.db.prepare("DELETE FROM images WHERE id = ?").run(id);
+        return info.changes > 0;
       }
-      static updateMetadata(id, metadata) {
-        return new Promise((resolve, reject) => {
-          init_12.db.run("UPDATE images SET metadata = ? WHERE id = ?", [JSON.stringify(metadata), id], function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.changes > 0);
-            }
-          });
-        });
+      static async updateMetadata(id, metadata) {
+        const info = init_12.db.prepare("UPDATE images SET metadata = ? WHERE id = ?").run(JSON.stringify(metadata), id);
+        return info.changes > 0;
       }
-      static updateAutoTags(id, autoTags) {
-        return new Promise((resolve, reject) => {
-          init_12.db.run("UPDATE images SET auto_tags = ? WHERE id = ?", [autoTags, id], function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.changes > 0);
-            }
-          });
-        });
+      static async updateAutoTags(id, autoTags) {
+        const info = init_12.db.prepare("UPDATE images SET auto_tags = ? WHERE id = ?").run(autoTags, id);
+        return info.changes > 0;
       }
     };
     exports2.ImageModel = ImageModel;
@@ -51735,236 +51570,126 @@ var require_RatingScore = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.RatingScoreModel = void 0;
     var init_12 = require_init2();
-    var RatingScoreModel = class _RatingScoreModel {
+    var RatingScoreModel = class {
       static async getWeights() {
-        return new Promise((resolve, reject) => {
-          init_12.db.get("SELECT * FROM rating_weights WHERE id = 1", [], (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row || null);
-            }
-          });
-        });
+        const row = init_12.db.prepare("SELECT * FROM rating_weights WHERE id = 1").get();
+        return row || null;
       }
       static async updateWeights(weights) {
-        return new Promise((resolve, reject) => {
-          const fields = [];
-          const values = [];
-          if (weights.general_weight !== void 0) {
-            fields.push("general_weight = ?");
-            values.push(weights.general_weight);
-          }
-          if (weights.sensitive_weight !== void 0) {
-            fields.push("sensitive_weight = ?");
-            values.push(weights.sensitive_weight);
-          }
-          if (weights.questionable_weight !== void 0) {
-            fields.push("questionable_weight = ?");
-            values.push(weights.questionable_weight);
-          }
-          if (weights.explicit_weight !== void 0) {
-            fields.push("explicit_weight = ?");
-            values.push(weights.explicit_weight);
-          }
-          if (fields.length === 0) {
-            reject(new Error("No fields to update"));
-            return;
-          }
-          fields.push("updated_at = CURRENT_TIMESTAMP");
-          const sql = `UPDATE rating_weights SET ${fields.join(", ")} WHERE id = 1`;
-          init_12.db.run(sql, values, function(err) {
-            if (err) {
-              reject(err);
-              return;
-            }
-            _RatingScoreModel.getWeights().then((result) => {
-              if (result) {
-                resolve(result);
-              } else {
-                reject(new Error("Failed to retrieve updated weights"));
-              }
-            }).catch(reject);
-          });
-        });
+        const fields = [];
+        const values = [];
+        if (weights.general_weight !== void 0) {
+          fields.push("general_weight = ?");
+          values.push(weights.general_weight);
+        }
+        if (weights.sensitive_weight !== void 0) {
+          fields.push("sensitive_weight = ?");
+          values.push(weights.sensitive_weight);
+        }
+        if (weights.questionable_weight !== void 0) {
+          fields.push("questionable_weight = ?");
+          values.push(weights.questionable_weight);
+        }
+        if (weights.explicit_weight !== void 0) {
+          fields.push("explicit_weight = ?");
+          values.push(weights.explicit_weight);
+        }
+        if (fields.length === 0) {
+          throw new Error("No fields to update");
+        }
+        fields.push("updated_at = CURRENT_TIMESTAMP");
+        const sql = `UPDATE rating_weights SET ${fields.join(", ")} WHERE id = 1`;
+        init_12.db.prepare(sql).run(...values);
+        const result = await this.getWeights();
+        if (!result) {
+          throw new Error("Failed to retrieve updated weights");
+        }
+        return result;
       }
       static async getAllTiers() {
-        return new Promise((resolve, reject) => {
-          init_12.db.all("SELECT * FROM rating_tiers ORDER BY tier_order ASC", [], (err, rows) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(rows || []);
-            }
-          });
-        });
+        const rows = init_12.db.prepare("SELECT * FROM rating_tiers ORDER BY tier_order ASC").all();
+        return rows || [];
       }
       static async getTierById(id) {
-        return new Promise((resolve, reject) => {
-          init_12.db.get("SELECT * FROM rating_tiers WHERE id = ?", [id], (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row || null);
-            }
-          });
-        });
+        const row = init_12.db.prepare("SELECT * FROM rating_tiers WHERE id = ?").get(id);
+        return row || null;
       }
       static async getTierByScore(score) {
-        return new Promise((resolve, reject) => {
-          init_12.db.get(`
-        SELECT * FROM rating_tiers
-        WHERE min_score <= ?
-          AND (max_score IS NULL OR max_score > ?)
-        ORDER BY tier_order ASC
-        LIMIT 1
-        `, [score, score], (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row || null);
-            }
-          });
-        });
+        const row = init_12.db.prepare(`
+      SELECT * FROM rating_tiers
+      WHERE min_score <= ?
+        AND (max_score IS NULL OR max_score > ?)
+      ORDER BY tier_order ASC
+      LIMIT 1
+    `).get(score, score);
+        return row || null;
       }
       static async createTier(tierData) {
-        return new Promise((resolve, reject) => {
-          init_12.db.run(`
-        INSERT INTO rating_tiers (tier_name, min_score, max_score, tier_order, color)
-        VALUES (?, ?, ?, ?, ?)
-        `, [
-            tierData.tier_name,
-            tierData.min_score,
-            tierData.max_score,
-            tierData.tier_order,
-            tierData.color || null
-          ], function(err) {
-            if (err) {
-              reject(err);
-              return;
-            }
-            _RatingScoreModel.getTierById(this.lastID).then((result) => {
-              if (result) {
-                resolve(result);
-              } else {
-                reject(new Error("Failed to retrieve created tier"));
-              }
-            }).catch(reject);
-          });
-        });
+        const info = init_12.db.prepare(`
+      INSERT INTO rating_tiers (tier_name, min_score, max_score, tier_order, color)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(tierData.tier_name, tierData.min_score, tierData.max_score, tierData.tier_order, tierData.color || null);
+        const result = await this.getTierById(info.lastInsertRowid);
+        if (!result) {
+          throw new Error("Failed to retrieve created tier");
+        }
+        return result;
       }
       static async updateTier(id, tierData) {
-        return new Promise((resolve, reject) => {
-          const fields = [];
-          const values = [];
-          if (tierData.tier_name !== void 0) {
-            fields.push("tier_name = ?");
-            values.push(tierData.tier_name);
-          }
-          if (tierData.min_score !== void 0) {
-            fields.push("min_score = ?");
-            values.push(tierData.min_score);
-          }
-          if (tierData.max_score !== void 0) {
-            fields.push("max_score = ?");
-            values.push(tierData.max_score);
-          }
-          if (tierData.tier_order !== void 0) {
-            fields.push("tier_order = ?");
-            values.push(tierData.tier_order);
-          }
-          if (tierData.color !== void 0) {
-            fields.push("color = ?");
-            values.push(tierData.color);
-          }
-          if (fields.length === 0) {
-            reject(new Error("No fields to update"));
-            return;
-          }
-          fields.push("updated_at = CURRENT_TIMESTAMP");
-          values.push(id);
-          const sql = `UPDATE rating_tiers SET ${fields.join(", ")} WHERE id = ?`;
-          init_12.db.run(sql, values, function(err) {
-            if (err) {
-              reject(err);
-              return;
-            }
-            _RatingScoreModel.getTierById(id).then((result) => {
-              if (result) {
-                resolve(result);
-              } else {
-                reject(new Error("Failed to retrieve updated tier"));
-              }
-            }).catch(reject);
-          });
-        });
+        const fields = [];
+        const values = [];
+        if (tierData.tier_name !== void 0) {
+          fields.push("tier_name = ?");
+          values.push(tierData.tier_name);
+        }
+        if (tierData.min_score !== void 0) {
+          fields.push("min_score = ?");
+          values.push(tierData.min_score);
+        }
+        if (tierData.max_score !== void 0) {
+          fields.push("max_score = ?");
+          values.push(tierData.max_score);
+        }
+        if (tierData.tier_order !== void 0) {
+          fields.push("tier_order = ?");
+          values.push(tierData.tier_order);
+        }
+        if (tierData.color !== void 0) {
+          fields.push("color = ?");
+          values.push(tierData.color);
+        }
+        if (fields.length === 0) {
+          throw new Error("No fields to update");
+        }
+        fields.push("updated_at = CURRENT_TIMESTAMP");
+        values.push(id);
+        const sql = `UPDATE rating_tiers SET ${fields.join(", ")} WHERE id = ?`;
+        init_12.db.prepare(sql).run(...values);
+        const result = await this.getTierById(id);
+        if (!result) {
+          throw new Error("Failed to retrieve updated tier");
+        }
+        return result;
       }
       static async deleteTier(id) {
-        return new Promise((resolve, reject) => {
-          init_12.db.run("DELETE FROM rating_tiers WHERE id = ?", [id], function(err) {
-            if (err) {
-              reject(err);
-            } else if (this.changes === 0) {
-              reject(new Error("Tier not found"));
-            } else {
-              resolve();
-            }
-          });
-        });
+        const info = init_12.db.prepare("DELETE FROM rating_tiers WHERE id = ?").run(id);
+        if (info.changes === 0) {
+          throw new Error("Tier not found");
+        }
       }
       static async updateAllTiers(tiers) {
-        return new Promise((resolve, reject) => {
-          init_12.db.serialize(() => {
-            init_12.db.run("BEGIN TRANSACTION", (err) => {
-              if (err) {
-                reject(err);
-                return;
-              }
-            });
-            init_12.db.run("DELETE FROM rating_tiers", (err) => {
-              if (err) {
-                init_12.db.run("ROLLBACK");
-                reject(err);
-                return;
-              }
-            });
-            let insertedCount = 0;
-            let hasError = false;
-            if (tiers.length === 0) {
-              init_12.db.run("COMMIT", (err) => {
-                if (err) {
-                  reject(err);
-                } else {
-                  resolve([]);
-                }
-              });
-              return;
-            }
-            tiers.forEach((tier) => {
-              init_12.db.run(`
-            INSERT INTO rating_tiers (tier_name, min_score, max_score, tier_order, color)
-            VALUES (?, ?, ?, ?, ?)
-            `, [tier.tier_name, tier.min_score, tier.max_score, tier.tier_order, tier.color || null], (err) => {
-                if (err && !hasError) {
-                  hasError = true;
-                  init_12.db.run("ROLLBACK");
-                  reject(err);
-                  return;
-                }
-                insertedCount++;
-                if (insertedCount === tiers.length && !hasError) {
-                  init_12.db.run("COMMIT", (err2) => {
-                    if (err2) {
-                      reject(err2);
-                      return;
-                    }
-                    _RatingScoreModel.getAllTiers().then(resolve).catch(reject);
-                  });
-                }
-              });
-            });
-          });
+        const transaction = init_12.db.transaction(() => {
+          init_12.db.prepare("DELETE FROM rating_tiers").run();
+          const insertStmt = init_12.db.prepare(`
+        INSERT INTO rating_tiers (tier_name, min_score, max_score, tier_order, color)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+          for (const tier of tiers) {
+            insertStmt.run(tier.tier_name, tier.min_score, tier.max_score, tier.tier_order, tier.color || null);
+          }
         });
+        transaction();
+        return this.getAllTiers();
       }
     };
     exports2.RatingScoreModel = RatingScoreModel;
@@ -52585,214 +52310,144 @@ var require_ImageSearchModel = __commonJS({
     var init_12 = require_init2();
     var autoTagSearchService_1 = require_autoTagSearchService();
     var ImageSearchModel = class {
-      static advancedSearch(searchParams, page = 1, limit = 20, sortBy = "upload_date", sortOrder = "DESC") {
-        return new Promise((resolve, reject) => {
-          const conditions = [];
-          const params = [];
-          if (searchParams.search_text) {
-            conditions.push("i.prompt LIKE ?");
-            params.push(`%${searchParams.search_text}%`);
+      static async advancedSearch(searchParams, page = 1, limit = 20, sortBy = "upload_date", sortOrder = "DESC") {
+        const conditions = [];
+        const params = [];
+        if (searchParams.search_text) {
+          conditions.push("i.prompt LIKE ?");
+          params.push(`%${searchParams.search_text}%`);
+        }
+        if (searchParams.negative_text) {
+          conditions.push("i.negative_prompt LIKE ?");
+          params.push(`%${searchParams.negative_text}%`);
+        }
+        if (searchParams.ai_tool) {
+          conditions.push("i.ai_tool = ?");
+          params.push(searchParams.ai_tool);
+        }
+        if (searchParams.model_name) {
+          conditions.push("i.model_name LIKE ?");
+          params.push(`%${searchParams.model_name}%`);
+        }
+        if (searchParams.min_width) {
+          conditions.push("i.width >= ?");
+          params.push(searchParams.min_width);
+        }
+        if (searchParams.max_width) {
+          conditions.push("i.width <= ?");
+          params.push(searchParams.max_width);
+        }
+        if (searchParams.min_height) {
+          conditions.push("i.height >= ?");
+          params.push(searchParams.min_height);
+        }
+        if (searchParams.max_height) {
+          conditions.push("i.height <= ?");
+          params.push(searchParams.max_height);
+        }
+        if (searchParams.min_file_size) {
+          conditions.push("i.file_size >= ?");
+          params.push(searchParams.min_file_size);
+        }
+        if (searchParams.max_file_size) {
+          conditions.push("i.file_size <= ?");
+          params.push(searchParams.max_file_size);
+        }
+        if (searchParams.start_date) {
+          conditions.push("DATE(i.upload_date) >= DATE(?)");
+          params.push(searchParams.start_date);
+        }
+        if (searchParams.end_date) {
+          conditions.push("DATE(i.upload_date) <= DATE(?)");
+          params.push(searchParams.end_date);
+        }
+        let groupJoinClause = "";
+        if (searchParams.group_id !== void 0) {
+          if (searchParams.group_id === 0) {
+            groupJoinClause = "LEFT JOIN image_groups ig_filter ON i.id = ig_filter.image_id";
+            conditions.push("ig_filter.image_id IS NULL");
+          } else {
+            groupJoinClause = "INNER JOIN image_groups ig_filter ON i.id = ig_filter.image_id";
+            conditions.push("ig_filter.group_id = ?");
+            params.push(searchParams.group_id);
           }
-          if (searchParams.negative_text) {
-            conditions.push("i.negative_prompt LIKE ?");
-            params.push(`%${searchParams.negative_text}%`);
-          }
-          if (searchParams.ai_tool) {
-            conditions.push("i.ai_tool = ?");
-            params.push(searchParams.ai_tool);
-          }
-          if (searchParams.model_name) {
-            conditions.push("i.model_name LIKE ?");
-            params.push(`%${searchParams.model_name}%`);
-          }
-          if (searchParams.min_width) {
-            conditions.push("i.width >= ?");
-            params.push(searchParams.min_width);
-          }
-          if (searchParams.max_width) {
-            conditions.push("i.width <= ?");
-            params.push(searchParams.max_width);
-          }
-          if (searchParams.min_height) {
-            conditions.push("i.height >= ?");
-            params.push(searchParams.min_height);
-          }
-          if (searchParams.max_height) {
-            conditions.push("i.height <= ?");
-            params.push(searchParams.max_height);
-          }
-          if (searchParams.min_file_size) {
-            conditions.push("i.file_size >= ?");
-            params.push(searchParams.min_file_size);
-          }
-          if (searchParams.max_file_size) {
-            conditions.push("i.file_size <= ?");
-            params.push(searchParams.max_file_size);
-          }
-          if (searchParams.start_date) {
-            conditions.push("DATE(i.upload_date) >= DATE(?)");
-            params.push(searchParams.start_date);
-          }
-          if (searchParams.end_date) {
-            conditions.push("DATE(i.upload_date) <= DATE(?)");
-            params.push(searchParams.end_date);
-          }
-          let groupJoinClause = "";
-          let groupFilterApplied = false;
-          if (searchParams.group_id !== void 0) {
-            if (searchParams.group_id === 0) {
-              groupJoinClause = "LEFT JOIN image_groups ig_filter ON i.id = ig_filter.image_id";
-              conditions.push("ig_filter.image_id IS NULL");
-              groupFilterApplied = true;
-            } else {
-              groupJoinClause = "INNER JOIN image_groups ig_filter ON i.id = ig_filter.image_id";
-              conditions.push("ig_filter.group_id = ?");
-              params.push(searchParams.group_id);
-              groupFilterApplied = true;
-            }
-          }
-          const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-          const offset = (page - 1) * limit;
-          const countQuery = `
-        SELECT COUNT(DISTINCT i.id) as total
-        FROM images i ${groupJoinClause} ${whereClause}
-      `;
-          init_12.db.get(countQuery, params, (err, countRow) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            const total = countRow.total;
-            const dataQuery = `
-          SELECT
-            i.*,
-            GROUP_CONCAT(DISTINCT g.id) as group_ids,
-            GROUP_CONCAT(DISTINCT g.name) as group_names,
-            GROUP_CONCAT(DISTINCT g.color) as group_colors,
-            GROUP_CONCAT(DISTINCT ig.collection_type) as collection_types
-          FROM images i
-          ${groupJoinClause}
-          LEFT JOIN image_groups ig ON i.id = ig.image_id
-          LEFT JOIN groups g ON ig.group_id = g.id
-          ${whereClause}
-          GROUP BY i.id
-          ORDER BY i.${sortBy} ${sortOrder}
-          LIMIT ? OFFSET ?
-        `;
-            init_12.db.all(dataQuery, [...params, limit, offset], (err2, rows) => {
-              if (err2) {
-                reject(err2);
-              } else {
-                const enrichedImages = rows.map((row) => ({
-                  ...row,
-                  groups: row.group_names ? row.group_names.split(",").map((name, index) => ({
-                    id: parseInt(row.group_ids.split(",")[index]),
-                    name,
-                    color: row.group_colors.split(",")[index] || null,
-                    collection_type: row.collection_types.split(",")[index]
-                  })) : []
-                }));
-                resolve({ images: enrichedImages, total });
-              }
-            });
-          });
-        });
+        }
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+        const offset = (page - 1) * limit;
+        const countQuery = `SELECT COUNT(DISTINCT i.id) as total FROM images i ${groupJoinClause} ${whereClause}`;
+        const countRow = init_12.db.prepare(countQuery).get(...params);
+        const total = countRow.total;
+        const dataQuery = `
+      SELECT i.*, GROUP_CONCAT(DISTINCT g.id) as group_ids, GROUP_CONCAT(DISTINCT g.name) as group_names,
+      GROUP_CONCAT(DISTINCT g.color) as group_colors, GROUP_CONCAT(DISTINCT ig.collection_type) as collection_types
+      FROM images i ${groupJoinClause}
+      LEFT JOIN image_groups ig ON i.id = ig.image_id
+      LEFT JOIN groups g ON ig.group_id = g.id ${whereClause}
+      GROUP BY i.id ORDER BY i.${sortBy} ${sortOrder} LIMIT ? OFFSET ?`;
+        const rows = init_12.db.prepare(dataQuery).all(...params, limit, offset);
+        const enrichedImages = rows.map((row) => ({
+          ...row,
+          groups: row.group_names ? row.group_names.split(",").map((name, index) => ({
+            id: parseInt(row.group_ids.split(",")[index]),
+            name,
+            color: row.group_colors.split(",")[index] || null,
+            collection_type: row.collection_types.split(",")[index]
+          })) : []
+        }));
+        return { images: enrichedImages, total };
       }
-      static findWithGroups(page = 1, limit = 20, sortBy = "upload_date", sortOrder = "DESC") {
-        return new Promise((resolve, reject) => {
-          const offset = (page - 1) * limit;
-          init_12.db.get("SELECT COUNT(*) as total FROM images", (err, countRow) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            const total = countRow.total;
-            const query = `
-          SELECT
-            i.*,
-            GROUP_CONCAT(g.id) as group_ids,
-            GROUP_CONCAT(g.name) as group_names,
-            GROUP_CONCAT(g.color) as group_colors,
-            GROUP_CONCAT(ig.collection_type) as collection_types
-          FROM images i
-          LEFT JOIN image_groups ig ON i.id = ig.image_id
-          LEFT JOIN groups g ON ig.group_id = g.id
-          GROUP BY i.id
-          ORDER BY i.${sortBy} ${sortOrder}
-          LIMIT ? OFFSET ?
-        `;
-            init_12.db.all(query, [limit, offset], (err2, rows) => {
-              if (err2) {
-                reject(err2);
-              } else {
-                const enrichedImages = rows.map((row) => ({
-                  ...row,
-                  groups: row.group_names ? row.group_names.split(",").map((name, index) => ({
-                    id: parseInt(row.group_ids.split(",")[index]),
-                    name,
-                    color: row.group_colors.split(",")[index] || null,
-                    collection_type: row.collection_types.split(",")[index]
-                  })) : []
-                }));
-                resolve({ images: enrichedImages, total });
-              }
-            });
-          });
-        });
+      static async findWithGroups(page = 1, limit = 20, sortBy = "upload_date", sortOrder = "DESC") {
+        const offset = (page - 1) * limit;
+        const countRow = init_12.db.prepare("SELECT COUNT(*) as total FROM images").get();
+        const total = countRow.total;
+        const query = `
+      SELECT i.*, GROUP_CONCAT(g.id) as group_ids, GROUP_CONCAT(g.name) as group_names,
+      GROUP_CONCAT(g.color) as group_colors, GROUP_CONCAT(ig.collection_type) as collection_types
+      FROM images i
+      LEFT JOIN image_groups ig ON i.id = ig.image_id
+      LEFT JOIN groups g ON ig.group_id = g.id
+      GROUP BY i.id ORDER BY i.${sortBy} ${sortOrder} LIMIT ? OFFSET ?`;
+        const rows = init_12.db.prepare(query).all(limit, offset);
+        const enrichedImages = rows.map((row) => ({
+          ...row,
+          groups: row.group_names ? row.group_names.split(",").map((name, index) => ({
+            id: parseInt(row.group_ids.split(",")[index]),
+            name,
+            color: row.group_colors.split(",")[index] || null,
+            collection_type: row.collection_types.split(",")[index]
+          })) : []
+        }));
+        return { images: enrichedImages, total };
       }
       static async searchByAutoTags(searchParams) {
-        return new Promise(async (resolve, reject) => {
-          const page = searchParams.page || 1;
-          const limit = searchParams.limit || 20;
-          const sortBy = searchParams.sortBy || "upload_date";
-          const sortOrder = searchParams.sortOrder || "DESC";
-          const offset = (page - 1) * limit;
-          const queryBuilder = await autoTagSearchService_1.AutoTagSearchService.buildAutoTagSearchQuery(searchParams);
-          const whereClause = queryBuilder.conditions.length > 0 ? `WHERE ${queryBuilder.conditions.join(" AND ")}` : "";
-          const countQuery = `
-        SELECT COUNT(DISTINCT i.id) as total
-        FROM images i
-        ${whereClause}
-      `;
-          init_12.db.get(countQuery, queryBuilder.params, (err, countRow) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            const total = countRow.total;
-            const dataQuery = `
-          SELECT
-            i.*,
-            GROUP_CONCAT(DISTINCT g.id) as group_ids,
-            GROUP_CONCAT(DISTINCT g.name) as group_names,
-            GROUP_CONCAT(DISTINCT g.color) as group_colors,
-            GROUP_CONCAT(DISTINCT ig.collection_type) as collection_types
-          FROM images i
-          LEFT JOIN image_groups ig ON i.id = ig.image_id
-          LEFT JOIN groups g ON ig.group_id = g.id
-          ${whereClause}
-          GROUP BY i.id
-          ORDER BY i.${sortBy} ${sortOrder}
-          LIMIT ? OFFSET ?
-        `;
-            init_12.db.all(dataQuery, [...queryBuilder.params, limit, offset], (err2, rows) => {
-              if (err2) {
-                reject(err2);
-              } else {
-                const enrichedImages = rows.map((row) => ({
-                  ...row,
-                  groups: row.group_names ? row.group_names.split(",").map((name, index) => ({
-                    id: parseInt(row.group_ids.split(",")[index]),
-                    name,
-                    color: row.group_colors.split(",")[index] || null,
-                    collection_type: row.collection_types.split(",")[index]
-                  })) : []
-                }));
-                resolve({ images: enrichedImages, total });
-              }
-            });
-          });
-        });
+        const page = searchParams.page || 1;
+        const limit = searchParams.limit || 20;
+        const sortBy = searchParams.sortBy || "upload_date";
+        const sortOrder = searchParams.sortOrder || "DESC";
+        const offset = (page - 1) * limit;
+        const queryBuilder = await autoTagSearchService_1.AutoTagSearchService.buildAutoTagSearchQuery(searchParams);
+        const whereClause = queryBuilder.conditions.length > 0 ? `WHERE ${queryBuilder.conditions.join(" AND ")}` : "";
+        const countQuery = `SELECT COUNT(DISTINCT i.id) as total FROM images i ${whereClause}`;
+        const countRow = init_12.db.prepare(countQuery).get(...queryBuilder.params);
+        const total = countRow.total;
+        const dataQuery = `
+      SELECT i.*, GROUP_CONCAT(DISTINCT g.id) as group_ids, GROUP_CONCAT(DISTINCT g.name) as group_names,
+      GROUP_CONCAT(DISTINCT g.color) as group_colors, GROUP_CONCAT(DISTINCT ig.collection_type) as collection_types
+      FROM images i
+      LEFT JOIN image_groups ig ON i.id = ig.image_id
+      LEFT JOIN groups g ON ig.group_id = g.id ${whereClause}
+      GROUP BY i.id ORDER BY i.${sortBy} ${sortOrder} LIMIT ? OFFSET ?`;
+        const rows = init_12.db.prepare(dataQuery).all(...queryBuilder.params, limit, offset);
+        const enrichedImages = rows.map((row) => ({
+          ...row,
+          groups: row.group_names ? row.group_names.split(",").map((name, index) => ({
+            id: parseInt(row.group_ids.split(",")[index]),
+            name,
+            color: row.group_colors.split(",")[index] || null,
+            collection_type: row.collection_types.split(",")[index]
+          })) : []
+        }));
+        return { images: enrichedImages, total };
       }
     };
     exports2.ImageSearchModel = ImageSearchModel;
@@ -52807,40 +52462,18 @@ var require_ImageTaggingModel = __commonJS({
     exports2.ImageTaggingModel = void 0;
     var init_12 = require_init2();
     var ImageTaggingModel = class {
-      static findUntagged(limit = 100) {
-        return new Promise((resolve, reject) => {
-          init_12.db.all(`SELECT * FROM images WHERE auto_tags IS NULL ORDER BY upload_date DESC LIMIT ?`, [limit], (err, rows) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(rows || []);
-            }
-          });
-        });
+      static async findUntagged(limit = 100) {
+        const rows = init_12.db.prepare(`SELECT * FROM images WHERE auto_tags IS NULL ORDER BY upload_date DESC LIMIT ?`).all(limit);
+        return rows || [];
       }
-      static findAllIds(limit) {
-        return new Promise((resolve, reject) => {
-          const query = limit ? `SELECT id FROM images ORDER BY upload_date DESC LIMIT ?` : `SELECT id FROM images ORDER BY upload_date DESC`;
-          const params = limit ? [limit] : [];
-          init_12.db.all(query, params, (err, rows) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(rows.map((row) => row.id));
-            }
-          });
-        });
+      static async findAllIds(limit) {
+        const query = limit ? `SELECT id FROM images ORDER BY upload_date DESC LIMIT ?` : `SELECT id FROM images ORDER BY upload_date DESC`;
+        const rows = limit ? init_12.db.prepare(query).all(limit) : init_12.db.prepare(query).all();
+        return rows.map((row) => row.id);
       }
-      static countUntagged() {
-        return new Promise((resolve, reject) => {
-          init_12.db.get(`SELECT COUNT(*) as count FROM images WHERE auto_tags IS NULL`, (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row.count);
-            }
-          });
-        });
+      static async countUntagged() {
+        const row = init_12.db.prepare(`SELECT COUNT(*) as count FROM images WHERE auto_tags IS NULL`).get();
+        return row.count;
       }
     };
     exports2.ImageTaggingModel = ImageTaggingModel;
@@ -52855,103 +52488,81 @@ var require_ImageStatsModel = __commonJS({
     exports2.ImageStatsModel = void 0;
     var init_12 = require_init2();
     var ImageStatsModel = class {
-      static getAutoTagStats() {
-        return new Promise((resolve, reject) => {
-          const statsQuery = `
-        SELECT
-          COUNT(*) as total_images,
-          SUM(CASE WHEN auto_tags IS NOT NULL THEN 1 ELSE 0 END) as tagged_images,
-          SUM(CASE WHEN auto_tags IS NULL THEN 1 ELSE 0 END) as untagged_images
-        FROM images
-      `;
-          init_12.db.get(statsQuery, [], (err, statsRow) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            const ratingQuery = `
-          SELECT
-            SUM(CASE
-              WHEN json_extract(auto_tags, '$.rating.general') >= json_extract(auto_tags, '$.rating.sensitive')
-                AND json_extract(auto_tags, '$.rating.general') >= json_extract(auto_tags, '$.rating.questionable')
-                AND json_extract(auto_tags, '$.rating.general') >= json_extract(auto_tags, '$.rating.explicit')
-              THEN 1 ELSE 0 END) as general,
-            SUM(CASE
-              WHEN json_extract(auto_tags, '$.rating.sensitive') > json_extract(auto_tags, '$.rating.general')
-                AND json_extract(auto_tags, '$.rating.sensitive') >= json_extract(auto_tags, '$.rating.questionable')
-                AND json_extract(auto_tags, '$.rating.sensitive') >= json_extract(auto_tags, '$.rating.explicit')
-              THEN 1 ELSE 0 END) as sensitive,
-            SUM(CASE
-              WHEN json_extract(auto_tags, '$.rating.questionable') > json_extract(auto_tags, '$.rating.general')
-                AND json_extract(auto_tags, '$.rating.questionable') > json_extract(auto_tags, '$.rating.sensitive')
-                AND json_extract(auto_tags, '$.rating.questionable') >= json_extract(auto_tags, '$.rating.explicit')
-              THEN 1 ELSE 0 END) as questionable,
-            SUM(CASE
-              WHEN json_extract(auto_tags, '$.rating.explicit') > json_extract(auto_tags, '$.rating.general')
-                AND json_extract(auto_tags, '$.rating.explicit') > json_extract(auto_tags, '$.rating.sensitive')
-                AND json_extract(auto_tags, '$.rating.explicit') > json_extract(auto_tags, '$.rating.questionable')
-              THEN 1 ELSE 0 END) as explicit
-          FROM images
-          WHERE auto_tags IS NOT NULL
-        `;
-            init_12.db.get(ratingQuery, [], (err2, ratingRow) => {
-              if (err2) {
-                reject(err2);
-                return;
-              }
-              const characterQuery = `
-            SELECT COUNT(*) as character_count
-            FROM images
-            WHERE auto_tags IS NOT NULL
-              AND json_extract(auto_tags, '$.character') IS NOT NULL
-              AND json_type(auto_tags, '$.character') = 'object'
-          `;
-              init_12.db.get(characterQuery, [], (err3, characterRow) => {
-                if (err3) {
-                  reject(err3);
-                  return;
-                }
-                const modelQuery = `
-              SELECT
-                json_extract(auto_tags, '$.model') as model,
-                COUNT(*) as count
-              FROM images
-              WHERE auto_tags IS NOT NULL
-                AND json_extract(auto_tags, '$.model') IS NOT NULL
-              GROUP BY model
-              ORDER BY count DESC
-            `;
-                init_12.db.all(modelQuery, [], (err4, modelRows) => {
-                  if (err4) {
-                    reject(err4);
-                    return;
-                  }
-                  const modelDistribution = {};
-                  modelRows.forEach((row) => {
-                    if (row.model) {
-                      modelDistribution[row.model] = row.count;
-                    }
-                  });
-                  const stats = {
-                    total_images: statsRow.total_images || 0,
-                    tagged_images: statsRow.tagged_images || 0,
-                    untagged_images: statsRow.untagged_images || 0,
-                    rating_distribution: {
-                      general: ratingRow?.general || 0,
-                      sensitive: ratingRow?.sensitive || 0,
-                      questionable: ratingRow?.questionable || 0,
-                      explicit: ratingRow?.explicit || 0
-                    },
-                    top_general_tags: [],
-                    character_count: characterRow?.character_count || 0,
-                    model_distribution: modelDistribution
-                  };
-                  resolve(stats);
-                });
-              });
-            });
-          });
+      static async getAutoTagStats() {
+        const statsQuery = `
+      SELECT
+        COUNT(*) as total_images,
+        SUM(CASE WHEN auto_tags IS NOT NULL THEN 1 ELSE 0 END) as tagged_images,
+        SUM(CASE WHEN auto_tags IS NULL THEN 1 ELSE 0 END) as untagged_images
+      FROM images
+    `;
+        const statsRow = init_12.db.prepare(statsQuery).get();
+        const ratingQuery = `
+      SELECT
+        SUM(CASE
+          WHEN json_extract(auto_tags, '$.rating.general') >= json_extract(auto_tags, '$.rating.sensitive')
+            AND json_extract(auto_tags, '$.rating.general') >= json_extract(auto_tags, '$.rating.questionable')
+            AND json_extract(auto_tags, '$.rating.general') >= json_extract(auto_tags, '$.rating.explicit')
+          THEN 1 ELSE 0 END) as general,
+        SUM(CASE
+          WHEN json_extract(auto_tags, '$.rating.sensitive') > json_extract(auto_tags, '$.rating.general')
+            AND json_extract(auto_tags, '$.rating.sensitive') >= json_extract(auto_tags, '$.rating.questionable')
+            AND json_extract(auto_tags, '$.rating.sensitive') >= json_extract(auto_tags, '$.rating.explicit')
+          THEN 1 ELSE 0 END) as sensitive,
+        SUM(CASE
+          WHEN json_extract(auto_tags, '$.rating.questionable') > json_extract(auto_tags, '$.rating.general')
+            AND json_extract(auto_tags, '$.rating.questionable') > json_extract(auto_tags, '$.rating.sensitive')
+            AND json_extract(auto_tags, '$.rating.questionable') >= json_extract(auto_tags, '$.rating.explicit')
+          THEN 1 ELSE 0 END) as questionable,
+        SUM(CASE
+          WHEN json_extract(auto_tags, '$.rating.explicit') > json_extract(auto_tags, '$.rating.general')
+            AND json_extract(auto_tags, '$.rating.explicit') > json_extract(auto_tags, '$.rating.sensitive')
+            AND json_extract(auto_tags, '$.rating.explicit') > json_extract(auto_tags, '$.rating.questionable')
+          THEN 1 ELSE 0 END) as explicit
+      FROM images
+      WHERE auto_tags IS NOT NULL
+    `;
+        const ratingRow = init_12.db.prepare(ratingQuery).get();
+        const characterQuery = `
+      SELECT COUNT(*) as character_count
+      FROM images
+      WHERE auto_tags IS NOT NULL
+        AND json_extract(auto_tags, '$.character') IS NOT NULL
+        AND json_type(auto_tags, '$.character') = 'object'
+    `;
+        const characterRow = init_12.db.prepare(characterQuery).get();
+        const modelQuery = `
+      SELECT
+        json_extract(auto_tags, '$.model') as model,
+        COUNT(*) as count
+      FROM images
+      WHERE auto_tags IS NOT NULL
+        AND json_extract(auto_tags, '$.model') IS NOT NULL
+      GROUP BY model
+      ORDER BY count DESC
+    `;
+        const modelRows = init_12.db.prepare(modelQuery).all();
+        const modelDistribution = {};
+        modelRows.forEach((row) => {
+          if (row.model) {
+            modelDistribution[row.model] = row.count;
+          }
         });
+        const stats = {
+          total_images: statsRow.total_images || 0,
+          tagged_images: statsRow.tagged_images || 0,
+          untagged_images: statsRow.untagged_images || 0,
+          rating_distribution: {
+            general: ratingRow?.general || 0,
+            sensitive: ratingRow?.sensitive || 0,
+            questionable: ratingRow?.questionable || 0,
+            explicit: ratingRow?.explicit || 0
+          },
+          top_general_tags: [],
+          character_count: characterRow?.character_count || 0,
+          model_distribution: modelDistribution
+        };
+        return stats;
       }
     };
     exports2.ImageStatsModel = ImageStatsModel;
@@ -53024,291 +52635,147 @@ var require_PromptCollection = __commonJS({
     exports2.PromptCollectionModel = void 0;
     var init_12 = require_init2();
     var PromptCollectionModel = class {
-      static addOrIncrement(prompt, group_id) {
-        return new Promise((resolve, reject) => {
-          init_12.db.get("SELECT id, usage_count FROM prompt_collection WHERE prompt = ?", [prompt], (err, row) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            if (row) {
-              init_12.db.run("UPDATE prompt_collection SET usage_count = usage_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [row.id], function(err2) {
-                if (err2) {
-                  reject(err2);
-                } else {
-                  resolve(row.id);
-                }
-              });
-            } else {
-              const stmt = init_12.db.prepare(`
-              INSERT INTO prompt_collection (prompt, usage_count, group_id)
-              VALUES (?, 1, ?)
-            `);
-              stmt.run([prompt, group_id || null], function(err2) {
-                if (err2) {
-                  reject(err2);
-                } else {
-                  resolve(this.lastID);
-                }
-              });
-              stmt.finalize();
-            }
-          });
-        });
+      static async addOrIncrement(prompt, group_id) {
+        const row = init_12.db.prepare("SELECT id, usage_count FROM prompt_collection WHERE prompt = ?").get(prompt);
+        if (row) {
+          init_12.db.prepare("UPDATE prompt_collection SET usage_count = usage_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(row.id);
+          return row.id;
+        } else {
+          const info = init_12.db.prepare(`
+        INSERT INTO prompt_collection (prompt, usage_count, group_id)
+        VALUES (?, 1, ?)
+      `).run(prompt, group_id || null);
+          return info.lastInsertRowid;
+        }
       }
-      static addOrIncrementNegative(prompt, group_id) {
-        return new Promise((resolve, reject) => {
-          init_12.db.get("SELECT id, usage_count FROM negative_prompt_collection WHERE prompt = ?", [prompt], (err, row) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            if (row) {
-              init_12.db.run("UPDATE negative_prompt_collection SET usage_count = usage_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [row.id], function(err2) {
-                if (err2) {
-                  reject(err2);
-                } else {
-                  resolve(row.id);
-                }
-              });
-            } else {
-              const stmt = init_12.db.prepare(`
-              INSERT INTO negative_prompt_collection (prompt, usage_count, group_id)
-              VALUES (?, 1, ?)
-            `);
-              stmt.run([prompt, group_id || null], function(err2) {
-                if (err2) {
-                  reject(err2);
-                } else {
-                  resolve(this.lastID);
-                }
-              });
-              stmt.finalize();
-            }
-          });
-        });
+      static async addOrIncrementNegative(prompt, group_id) {
+        const row = init_12.db.prepare("SELECT id, usage_count FROM negative_prompt_collection WHERE prompt = ?").get(prompt);
+        if (row) {
+          init_12.db.prepare("UPDATE negative_prompt_collection SET usage_count = usage_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(row.id);
+          return row.id;
+        } else {
+          const info = init_12.db.prepare(`
+        INSERT INTO negative_prompt_collection (prompt, usage_count, group_id)
+        VALUES (?, 1, ?)
+      `).run(prompt, group_id || null);
+          return info.lastInsertRowid;
+        }
       }
-      static searchPrompts(query, page = 1, limit = 20, sortBy = "usage_count", sortOrder = "DESC") {
-        return new Promise((resolve, reject) => {
-          const searchPattern = `%${query}%`;
-          const offset = (page - 1) * limit;
-          init_12.db.get("SELECT COUNT(*) as total FROM prompt_collection WHERE prompt LIKE ?", [searchPattern], (err, countRow) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            const total = countRow.total;
-            init_12.db.all(`SELECT id, prompt, usage_count, group_id, synonyms
-             FROM prompt_collection
-             WHERE prompt LIKE ?
-             ORDER BY ${sortBy} ${sortOrder}
-             LIMIT ? OFFSET ?`, [searchPattern, limit, offset], (err2, rows) => {
-              if (err2) {
-                reject(err2);
-              } else {
-                const prompts = rows.map((row) => ({
-                  id: row.id,
-                  prompt: row.prompt,
-                  usage_count: row.usage_count,
-                  group_id: row.group_id,
-                  synonyms: row.synonyms ? JSON.parse(row.synonyms) : [],
-                  type: "positive"
-                }));
-                resolve({ prompts, total });
-              }
-            });
-          });
-        });
+      static async searchPrompts(query, page = 1, limit = 20, sortBy = "usage_count", sortOrder = "DESC") {
+        const searchPattern = `%${query}%`;
+        const offset = (page - 1) * limit;
+        const countRow = init_12.db.prepare("SELECT COUNT(*) as total FROM prompt_collection WHERE prompt LIKE ?").get(searchPattern);
+        const total = countRow.total;
+        const rows = init_12.db.prepare(`SELECT id, prompt, usage_count, group_id, synonyms
+       FROM prompt_collection
+       WHERE prompt LIKE ?
+       ORDER BY ${sortBy} ${sortOrder}
+       LIMIT ? OFFSET ?`).all(searchPattern, limit, offset);
+        const prompts = rows.map((row) => ({
+          id: row.id,
+          prompt: row.prompt,
+          usage_count: row.usage_count,
+          group_id: row.group_id,
+          synonyms: row.synonyms ? JSON.parse(row.synonyms) : [],
+          type: "positive"
+        }));
+        return { prompts, total };
       }
-      static searchNegativePrompts(query, page = 1, limit = 20, sortBy = "usage_count", sortOrder = "DESC") {
-        return new Promise((resolve, reject) => {
-          const searchPattern = `%${query}%`;
-          const offset = (page - 1) * limit;
-          init_12.db.get("SELECT COUNT(*) as total FROM negative_prompt_collection WHERE prompt LIKE ?", [searchPattern], (err, countRow) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            const total = countRow.total;
-            init_12.db.all(`SELECT id, prompt, usage_count, group_id, synonyms
-             FROM negative_prompt_collection
-             WHERE prompt LIKE ?
-             ORDER BY ${sortBy} ${sortOrder}
-             LIMIT ? OFFSET ?`, [searchPattern, limit, offset], (err2, rows) => {
-              if (err2) {
-                reject(err2);
-              } else {
-                const prompts = rows.map((row) => ({
-                  id: row.id,
-                  prompt: row.prompt,
-                  usage_count: row.usage_count,
-                  group_id: row.group_id,
-                  synonyms: row.synonyms ? JSON.parse(row.synonyms) : [],
-                  type: "negative"
-                }));
-                resolve({ prompts, total });
-              }
-            });
-          });
-        });
+      static async searchNegativePrompts(query, page = 1, limit = 20, sortBy = "usage_count", sortOrder = "DESC") {
+        const searchPattern = `%${query}%`;
+        const offset = (page - 1) * limit;
+        const countRow = init_12.db.prepare("SELECT COUNT(*) as total FROM negative_prompt_collection WHERE prompt LIKE ?").get(searchPattern);
+        const total = countRow.total;
+        const rows = init_12.db.prepare(`SELECT id, prompt, usage_count, group_id, synonyms
+       FROM negative_prompt_collection
+       WHERE prompt LIKE ?
+       ORDER BY ${sortBy} ${sortOrder}
+       LIMIT ? OFFSET ?`).all(searchPattern, limit, offset);
+        const prompts = rows.map((row) => ({
+          id: row.id,
+          prompt: row.prompt,
+          usage_count: row.usage_count,
+          group_id: row.group_id,
+          synonyms: row.synonyms ? JSON.parse(row.synonyms) : [],
+          type: "negative"
+        }));
+        return { prompts, total };
       }
-      static getMostUsedPrompts(limit = 10) {
-        return new Promise((resolve, reject) => {
-          init_12.db.all(`SELECT id, prompt, usage_count, group_id, synonyms, 'positive' as type
-         FROM prompt_collection
-         ORDER BY usage_count DESC
-         LIMIT ?`, [limit], (err, rows) => {
-            if (err) {
-              reject(err);
-            } else {
-              const prompts = rows.map((row) => ({
-                id: row.id,
-                prompt: row.prompt,
-                usage_count: row.usage_count,
-                group_id: row.group_id,
-                synonyms: row.synonyms ? JSON.parse(row.synonyms) : [],
-                type: row.type
-              }));
-              resolve(prompts);
-            }
-          });
-        });
+      static async getMostUsedPrompts(limit = 10) {
+        const rows = init_12.db.prepare(`SELECT id, prompt, usage_count, group_id, synonyms, 'positive' as type
+       FROM prompt_collection
+       ORDER BY usage_count DESC
+       LIMIT ?`).all(limit);
+        const prompts = rows.map((row) => ({
+          id: row.id,
+          prompt: row.prompt,
+          usage_count: row.usage_count,
+          group_id: row.group_id,
+          synonyms: row.synonyms ? JSON.parse(row.synonyms) : [],
+          type: row.type
+        }));
+        return prompts;
       }
-      static setSynonyms(id, synonyms, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          const synonymsJson = JSON.stringify(synonyms);
-          init_12.db.run(`UPDATE ${tableName} SET synonyms = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [synonymsJson, id], function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.changes > 0);
-            }
-          });
-        });
+      static async setSynonyms(id, synonyms, type = "positive") {
+        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const synonymsJson = JSON.stringify(synonyms);
+        const info = init_12.db.prepare(`UPDATE ${tableName} SET synonyms = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(synonymsJson, id);
+        return info.changes > 0;
       }
-      static setGroupId(id, group_id, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          init_12.db.run(`UPDATE ${tableName} SET group_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [group_id, id], function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.changes > 0);
-            }
-          });
-        });
+      static async setGroupId(id, group_id, type = "positive") {
+        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const info = init_12.db.prepare(`UPDATE ${tableName} SET group_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(group_id, id);
+        return info.changes > 0;
       }
-      static decrementUsage(prompt, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          init_12.db.get(`SELECT id, usage_count FROM ${tableName} WHERE prompt = ?`, [prompt], (err, row) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            if (!row) {
-              resolve(false);
-              return;
-            }
-            if (row.usage_count <= 0) {
-              resolve(false);
-              return;
-            }
-            init_12.db.run(`UPDATE ${tableName} SET usage_count = MAX(0, usage_count - 1), updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [row.id], function(err2) {
-              if (err2) {
-                reject(err2);
-              } else {
-                resolve(this.changes > 0);
-              }
-            });
-          });
-        });
+      static async decrementUsage(prompt, type = "positive") {
+        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const row = init_12.db.prepare(`SELECT id, usage_count FROM ${tableName} WHERE prompt = ?`).get(prompt);
+        if (!row) {
+          return false;
+        }
+        if (row.usage_count <= 0) {
+          return false;
+        }
+        const info = init_12.db.prepare(`UPDATE ${tableName} SET usage_count = MAX(0, usage_count - 1), updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(row.id);
+        return info.changes > 0;
       }
-      static delete(id, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          init_12.db.run(`DELETE FROM ${tableName} WHERE id = ?`, [id], function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.changes > 0);
-            }
-          });
-        });
+      static async delete(id, type = "positive") {
+        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const info = init_12.db.prepare(`DELETE FROM ${tableName} WHERE id = ?`).run(id);
+        return info.changes > 0;
       }
-      static exportAllSettings(type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          init_12.db.all(`SELECT prompt, group_id, synonyms FROM ${tableName}
-         WHERE group_id IS NOT NULL OR synonyms IS NOT NULL
-         ORDER BY prompt`, [], (err, rows) => {
-            if (err) {
-              reject(err);
-            } else {
-              const settings = rows.map((row) => ({
-                prompt: row.prompt,
-                group_id: row.group_id,
-                synonyms: row.synonyms ? JSON.parse(row.synonyms) : null
-              }));
-              resolve(settings);
-            }
-          });
-        });
+      static async exportAllSettings(type = "positive") {
+        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const rows = init_12.db.prepare(`SELECT prompt, group_id, synonyms FROM ${tableName}
+       WHERE group_id IS NOT NULL OR synonyms IS NOT NULL
+       ORDER BY prompt`).all();
+        const settings = rows.map((row) => ({
+          prompt: row.prompt,
+          group_id: row.group_id,
+          synonyms: row.synonyms ? JSON.parse(row.synonyms) : null
+        }));
+        return settings;
       }
-      static importSettings(settings, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          let updatedCount = 0;
-          let completed = 0;
-          if (settings.length === 0) {
-            resolve(0);
-            return;
+      static async importSettings(settings, type = "positive") {
+        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        let updatedCount = 0;
+        if (settings.length === 0) {
+          return 0;
+        }
+        for (const setting of settings) {
+          const row = init_12.db.prepare(`SELECT id FROM ${tableName} WHERE prompt = ?`).get(setting.prompt);
+          if (row) {
+            const synonymsJson = setting.synonyms ? JSON.stringify(setting.synonyms) : null;
+            const info = init_12.db.prepare(`UPDATE ${tableName} SET group_id = ?, synonyms = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(setting.group_id || null, synonymsJson, row.id);
+            if (info.changes > 0)
+              updatedCount++;
+          } else {
+            const synonymsJson = setting.synonyms ? JSON.stringify(setting.synonyms) : null;
+            init_12.db.prepare(`INSERT INTO ${tableName} (prompt, usage_count, group_id, synonyms) VALUES (?, 0, ?, ?)`).run(setting.prompt, setting.group_id || null, synonymsJson);
+            updatedCount++;
           }
-          settings.forEach((setting) => {
-            init_12.db.get(`SELECT id FROM ${tableName} WHERE prompt = ?`, [setting.prompt], (err, row) => {
-              if (err) {
-                completed++;
-                if (completed === settings.length) {
-                  reject(err);
-                }
-                return;
-              }
-              if (row) {
-                const synonymsJson = setting.synonyms ? JSON.stringify(setting.synonyms) : null;
-                init_12.db.run(`UPDATE ${tableName} SET group_id = ?, synonyms = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [setting.group_id || null, synonymsJson, row.id], function(updateErr) {
-                  completed++;
-                  if (updateErr) {
-                    if (completed === settings.length) {
-                      reject(updateErr);
-                    }
-                  } else {
-                    if (this.changes > 0)
-                      updatedCount++;
-                    if (completed === settings.length) {
-                      resolve(updatedCount);
-                    }
-                  }
-                });
-              } else {
-                const synonymsJson = setting.synonyms ? JSON.stringify(setting.synonyms) : null;
-                init_12.db.run(`INSERT INTO ${tableName} (prompt, usage_count, group_id, synonyms) VALUES (?, 0, ?, ?)`, [setting.prompt, setting.group_id || null, synonymsJson], function(insertErr) {
-                  completed++;
-                  if (insertErr) {
-                    if (completed === settings.length) {
-                      reject(insertErr);
-                    }
-                  } else {
-                    updatedCount++;
-                    if (completed === settings.length) {
-                      resolve(updatedCount);
-                    }
-                  }
-                });
-              }
-            });
-          });
-        });
+        }
+        return updatedCount;
       }
     };
     exports2.PromptCollectionModel = PromptCollectionModel;
@@ -53421,67 +52888,38 @@ var require_synonymService = __commonJS({
           throw error;
         }
       }
-      static findPromptByNormalizedText(normalizedText, type) {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          init_12.db.get(`SELECT * FROM ${tableName} WHERE prompt = ? COLLATE NOCASE`, [normalizedText], (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row || null);
-            }
-          });
-        });
+      static async findPromptByNormalizedText(normalizedText, type) {
+        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const row = init_12.db.prepare(`SELECT * FROM ${tableName} WHERE prompt = ? COLLATE NOCASE`).get(normalizedText);
+        return row || null;
       }
-      static mergeUsageCount(mainPromptId, additionalCount, type) {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          init_12.db.run(`UPDATE ${tableName}
-         SET usage_count = usage_count + ?, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?`, [additionalCount, mainPromptId], (err) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-        });
+      static async mergeUsageCount(mainPromptId, additionalCount, type) {
+        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        init_12.db.prepare(`UPDATE ${tableName}
+       SET usage_count = usage_count + ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`).run(additionalCount, mainPromptId);
       }
       static async findInSynonymGroup(searchTerm, type = "positive") {
         try {
           const normalizedSearch = (0, promptParser_1.normalizeSearchTerm)(searchTerm);
           const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          return new Promise((resolve, reject) => {
-            init_12.db.get(`SELECT * FROM ${tableName} WHERE prompt = ? COLLATE NOCASE`, [normalizedSearch], (err, directMatch) => {
-              if (err) {
-                reject(err);
-                return;
+          const directMatch = init_12.db.prepare(`SELECT * FROM ${tableName} WHERE prompt = ? COLLATE NOCASE`).get(normalizedSearch);
+          if (directMatch) {
+            return directMatch;
+          }
+          const rows = init_12.db.prepare(`SELECT * FROM ${tableName} WHERE synonyms IS NOT NULL`).all();
+          for (const row of rows) {
+            try {
+              const synonyms = JSON.parse(row.synonyms || "[]");
+              const normalizedSynonyms = synonyms.map((s) => s.toLowerCase());
+              if (normalizedSynonyms.includes(normalizedSearch.toLowerCase())) {
+                return row;
               }
-              if (directMatch) {
-                resolve(directMatch);
-                return;
-              }
-              init_12.db.all(`SELECT * FROM ${tableName} WHERE synonyms IS NOT NULL`, [], (err2, rows) => {
-                if (err2) {
-                  reject(err2);
-                  return;
-                }
-                for (const row of rows) {
-                  try {
-                    const synonyms = JSON.parse(row.synonyms || "[]");
-                    const normalizedSynonyms = synonyms.map((s) => s.toLowerCase());
-                    if (normalizedSynonyms.includes(normalizedSearch.toLowerCase())) {
-                      resolve(row);
-                      return;
-                    }
-                  } catch (parseError) {
-                    continue;
-                  }
-                }
-                resolve(null);
-              });
-            });
-          });
+            } catch (parseError) {
+              continue;
+            }
+          }
+          return null;
         } catch (error) {
           console.error("Error in findInSynonymGroup:", error);
           throw error;
@@ -53490,51 +52928,31 @@ var require_synonymService = __commonJS({
       static async removeSynonym(mainPromptId, synonymToRemove, type = "positive") {
         try {
           const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          return new Promise((resolve, reject) => {
-            init_12.db.get(`SELECT synonyms FROM ${tableName} WHERE id = ?`, [mainPromptId], (err, row) => {
-              if (err) {
-                reject(err);
-                return;
-              }
-              if (!row || !row.synonyms) {
-                resolve(false);
-                return;
-              }
-              try {
-                const synonyms = JSON.parse(row.synonyms);
-                const normalizedToRemove = (0, promptParser_1.normalizeSearchTerm)(synonymToRemove).toLowerCase();
-                const updatedSynonyms = synonyms.filter((s) => (0, promptParser_1.normalizeSearchTerm)(s).toLowerCase() !== normalizedToRemove);
-                const updatedSynonymsJson = JSON.stringify(updatedSynonyms);
-                init_12.db.run(`UPDATE ${tableName}
-                 SET synonyms = ?, updated_at = CURRENT_TIMESTAMP
-                 WHERE id = ?`, [updatedSynonymsJson, mainPromptId], function(err2) {
-                  if (err2) {
-                    reject(err2);
-                  } else {
-                    resolve(this.changes > 0);
-                  }
-                });
-              } catch (parseError) {
-                reject(parseError);
-              }
-            });
-          });
+          const row = init_12.db.prepare(`SELECT synonyms FROM ${tableName} WHERE id = ?`).get(mainPromptId);
+          if (!row || !row.synonyms) {
+            return false;
+          }
+          try {
+            const synonyms = JSON.parse(row.synonyms);
+            const normalizedToRemove = (0, promptParser_1.normalizeSearchTerm)(synonymToRemove).toLowerCase();
+            const updatedSynonyms = synonyms.filter((s) => (0, promptParser_1.normalizeSearchTerm)(s).toLowerCase() !== normalizedToRemove);
+            const updatedSynonymsJson = JSON.stringify(updatedSynonyms);
+            const info = init_12.db.prepare(`UPDATE ${tableName}
+               SET synonyms = ?, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?`).run(updatedSynonymsJson, mainPromptId);
+            return info.changes > 0;
+          } catch (parseError) {
+            throw parseError;
+          }
         } catch (error) {
           console.error("Error in removeSynonym:", error);
           throw error;
         }
       }
       static async getGroupPrompts(groupId, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          init_12.db.all(`SELECT * FROM ${tableName} WHERE group_id = ? ORDER BY usage_count DESC`, [groupId], (err, rows) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(rows || []);
-            }
-          });
-        });
+        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const rows = init_12.db.prepare(`SELECT * FROM ${tableName} WHERE group_id = ? ORDER BY usage_count DESC`).all(groupId);
+        return rows || [];
       }
     };
     exports2.SynonymService = SynonymService;
@@ -53549,234 +52967,121 @@ var require_PromptGroup = __commonJS({
     exports2.PromptGroupModel = void 0;
     var init_12 = require_init2();
     var PromptGroupModel = class {
-      static create(data, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
-          if (data.display_order === void 0) {
-            init_12.db.get(`SELECT MAX(display_order) as max_order FROM ${tableName}`, [], (err, row) => {
-              if (err) {
-                reject(err);
-                return;
-              }
-              const nextOrder = (row.max_order || 0) + 1;
-              this.insertGroup(tableName, { ...data, display_order: nextOrder }, resolve, reject);
-            });
-          } else {
-            this.insertGroup(tableName, data, resolve, reject);
-          }
-        });
+      static async create(data, type = "positive") {
+        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        if (data.display_order === void 0) {
+          const row = init_12.db.prepare(`SELECT MAX(display_order) as max_order FROM ${tableName}`).get();
+          const nextOrder = (row.max_order || 0) + 1;
+          return this.insertGroup(tableName, { ...data, display_order: nextOrder });
+        } else {
+          return this.insertGroup(tableName, data);
+        }
       }
-      static insertGroup(tableName, data, resolve, reject) {
-        const stmt = init_12.db.prepare(`
+      static insertGroup(tableName, data) {
+        const info = init_12.db.prepare(`
       INSERT INTO ${tableName} (group_name, display_order, is_visible)
       VALUES (?, ?, ?)
-    `);
-        stmt.run([
-          data.group_name,
-          data.display_order || 0,
-          data.is_visible !== void 0 ? data.is_visible : true
-        ], function(err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(this.lastID);
-          }
-        });
-        stmt.finalize();
+    `).run(data.group_name, data.display_order || 0, data.is_visible !== void 0 ? data.is_visible : true);
+        return info.lastInsertRowid;
       }
-      static findAll(includeHidden = false, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
-          const visibilityFilter = includeHidden ? "" : "WHERE is_visible = 1";
-          init_12.db.all(`SELECT * FROM ${tableName} ${visibilityFilter} ORDER BY display_order ASC`, [], (err, rows) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(rows || []);
-            }
-          });
-        });
+      static async findAll(includeHidden = false, type = "positive") {
+        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const visibilityFilter = includeHidden ? "" : "WHERE is_visible = 1";
+        const rows = init_12.db.prepare(`SELECT * FROM ${tableName} ${visibilityFilter} ORDER BY display_order ASC`).all();
+        return rows || [];
       }
-      static findAllWithCounts(includeHidden = false, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const groupTableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
-          const promptTableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          const visibilityFilter = includeHidden ? "" : "WHERE g.is_visible = 1";
-          init_12.db.all(`SELECT
-           g.*,
-           COUNT(p.id) as prompt_count
-         FROM ${groupTableName} g
-         LEFT JOIN ${promptTableName} p ON g.id = p.group_id
-         ${visibilityFilter}
-         GROUP BY g.id
-         ORDER BY g.display_order ASC`, [], (err, rows) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(rows || []);
-            }
-          });
-        });
+      static async findAllWithCounts(includeHidden = false, type = "positive") {
+        const groupTableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const promptTableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const visibilityFilter = includeHidden ? "" : "WHERE g.is_visible = 1";
+        const rows = init_12.db.prepare(`SELECT
+       g.*,
+       COUNT(p.id) as prompt_count
+     FROM ${groupTableName} g
+     LEFT JOIN ${promptTableName} p ON g.id = p.group_id
+     ${visibilityFilter}
+     GROUP BY g.id
+     ORDER BY g.display_order ASC`).all();
+        return rows || [];
       }
-      static findById(id, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
-          init_12.db.get(`SELECT * FROM ${tableName} WHERE id = ?`, [id], (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row || null);
-            }
-          });
-        });
+      static async findById(id, type = "positive") {
+        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const row = init_12.db.prepare(`SELECT * FROM ${tableName} WHERE id = ?`).get(id);
+        return row || null;
       }
-      static findByName(groupName, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
-          init_12.db.get(`SELECT * FROM ${tableName} WHERE group_name = ?`, [groupName], (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row || null);
-            }
-          });
-        });
+      static async findByName(groupName, type = "positive") {
+        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const row = init_12.db.prepare(`SELECT * FROM ${tableName} WHERE group_name = ?`).get(groupName);
+        return row || null;
       }
-      static update(id, data, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
-          const updateFields = [];
-          const values = [];
-          if (data.group_name !== void 0) {
-            updateFields.push("group_name = ?");
-            values.push(data.group_name);
-          }
-          if (data.display_order !== void 0) {
-            updateFields.push("display_order = ?");
-            values.push(data.display_order);
-          }
-          if (data.is_visible !== void 0) {
-            updateFields.push("is_visible = ?");
-            values.push(data.is_visible);
-          }
-          if (updateFields.length === 0) {
-            resolve(false);
-            return;
-          }
-          updateFields.push("updated_at = CURRENT_TIMESTAMP");
-          values.push(id);
-          init_12.db.run(`UPDATE ${tableName} SET ${updateFields.join(", ")} WHERE id = ?`, values, function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.changes > 0);
-            }
-          });
-        });
+      static async update(id, data, type = "positive") {
+        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const updateFields = [];
+        const values = [];
+        if (data.group_name !== void 0) {
+          updateFields.push("group_name = ?");
+          values.push(data.group_name);
+        }
+        if (data.display_order !== void 0) {
+          updateFields.push("display_order = ?");
+          values.push(data.display_order);
+        }
+        if (data.is_visible !== void 0) {
+          updateFields.push("is_visible = ?");
+          values.push(data.is_visible);
+        }
+        if (updateFields.length === 0) {
+          return false;
+        }
+        updateFields.push("updated_at = CURRENT_TIMESTAMP");
+        values.push(id);
+        const info = init_12.db.prepare(`UPDATE ${tableName} SET ${updateFields.join(", ")} WHERE id = ?`).run(...values);
+        return info.changes > 0;
       }
-      static delete(id, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
-          init_12.db.run(`DELETE FROM ${tableName} WHERE id = ?`, [id], function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.changes > 0);
-            }
-          });
-        });
+      static async delete(id, type = "positive") {
+        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const info = init_12.db.prepare(`DELETE FROM ${tableName} WHERE id = ?`).run(id);
+        return info.changes > 0;
       }
-      static reassignGroupIds(groupData, type = "positive") {
-        return new Promise(async (resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
-          const reassignments = [];
-          try {
-            const existingGroups = await this.findAll(true, type);
-            await new Promise((res, rej) => {
-              init_12.db.run(`CREATE TEMPORARY TABLE temp_${tableName} AS SELECT * FROM ${tableName}`, (err) => {
-                if (err)
-                  rej(err);
-                else
-                  res();
-              });
+      static async reassignGroupIds(groupData, type = "positive") {
+        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const reassignments = [];
+        const existingGroups = await this.findAll(true, type);
+        init_12.db.prepare(`CREATE TEMPORARY TABLE temp_${tableName} AS SELECT * FROM ${tableName}`).run();
+        init_12.db.prepare(`DELETE FROM ${tableName}`).run();
+        for (const group of groupData) {
+          const info = init_12.db.prepare(`INSERT INTO ${tableName} (group_name, display_order, is_visible, created_at, updated_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`).run(group.group_name, group.display_order, group.is_visible);
+          const newId = info.lastInsertRowid;
+          if (group.id) {
+            reassignments.push({
+              old_id: group.id,
+              new_id: newId,
+              group_name: group.group_name
             });
-            await new Promise((res, rej) => {
-              init_12.db.run(`DELETE FROM ${tableName}`, (err) => {
-                if (err)
-                  rej(err);
-                else
-                  res();
-              });
-            });
-            for (const group of groupData) {
-              const newId = await new Promise((res, rej) => {
-                init_12.db.run(`INSERT INTO ${tableName} (group_name, display_order, is_visible, created_at, updated_at)
-               VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, [group.group_name, group.display_order, group.is_visible], function(err) {
-                  if (err)
-                    rej(err);
-                  else
-                    res(this.lastID);
-                });
-              });
-              if (group.id) {
-                reassignments.push({
-                  old_id: group.id,
-                  new_id: newId,
-                  group_name: group.group_name
-                });
-              }
-            }
-            const jsonGroupNames = new Set(groupData.map((g) => g.group_name));
-            const existingNonDuplicate = existingGroups.filter((g) => !jsonGroupNames.has(g.group_name));
-            for (const existingGroup of existingNonDuplicate) {
-              const newId = await new Promise((res, rej) => {
-                init_12.db.run(`INSERT INTO ${tableName} (group_name, display_order, is_visible, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?)`, [
-                  existingGroup.group_name,
-                  existingGroup.display_order,
-                  existingGroup.is_visible,
-                  existingGroup.created_at,
-                  existingGroup.updated_at
-                ], function(err) {
-                  if (err)
-                    rej(err);
-                  else
-                    res(this.lastID);
-                });
-              });
-              reassignments.push({
-                old_id: existingGroup.id,
-                new_id: newId,
-                group_name: existingGroup.group_name
-              });
-            }
-            await new Promise((res, rej) => {
-              init_12.db.run(`DROP TABLE temp_${tableName}`, (err) => {
-                if (err)
-                  rej(err);
-                else
-                  res();
-              });
-            });
-            resolve(reassignments);
-          } catch (error) {
-            reject(error);
           }
-        });
-      }
-      static exportForJSON(type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
-          init_12.db.all(`SELECT id, group_name, display_order, is_visible
-         FROM ${tableName}
-         ORDER BY display_order ASC`, [], (err, rows) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(rows || []);
-            }
+        }
+        const jsonGroupNames = new Set(groupData.map((g) => g.group_name));
+        const existingNonDuplicate = existingGroups.filter((g) => !jsonGroupNames.has(g.group_name));
+        for (const existingGroup of existingNonDuplicate) {
+          const info = init_12.db.prepare(`INSERT INTO ${tableName} (group_name, display_order, is_visible, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?)`).run(existingGroup.group_name, existingGroup.display_order, existingGroup.is_visible, existingGroup.created_at, existingGroup.updated_at);
+          const newId = info.lastInsertRowid;
+          reassignments.push({
+            old_id: existingGroup.id,
+            new_id: newId,
+            group_name: existingGroup.group_name
           });
-        });
+        }
+        init_12.db.prepare(`DROP TABLE temp_${tableName}`).run();
+        return reassignments;
+      }
+      static async exportForJSON(type = "positive") {
+        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const rows = init_12.db.prepare(`SELECT id, group_name, display_order, is_visible
+     FROM ${tableName}
+     ORDER BY display_order ASC`).all();
+        return rows || [];
       }
     };
     exports2.PromptGroupModel = PromptGroupModel;
@@ -53905,80 +53210,54 @@ var require_promptGroupService = __commonJS({
           throw error;
         }
       }
-      static updatePromptGroupIds(oldGroupId, newGroupId, type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          let query;
-          let params;
-          if (oldGroupId === null) {
-            query = `UPDATE ${tableName} SET group_id = ?, updated_at = CURRENT_TIMESTAMP WHERE group_id IS NULL`;
-            params = [newGroupId];
-          } else {
-            query = `UPDATE ${tableName} SET group_id = ?, updated_at = CURRENT_TIMESTAMP WHERE group_id = ?`;
-            params = [newGroupId, oldGroupId];
-          }
-          init_12.db.run(query, params, function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.changes);
-            }
-          });
-        });
+      static async updatePromptGroupIds(oldGroupId, newGroupId, type = "positive") {
+        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        let query;
+        let params;
+        if (oldGroupId === null) {
+          query = `UPDATE ${tableName} SET group_id = ?, updated_at = CURRENT_TIMESTAMP WHERE group_id IS NULL`;
+          params = [newGroupId];
+        } else {
+          query = `UPDATE ${tableName} SET group_id = ?, updated_at = CURRENT_TIMESTAMP WHERE group_id = ?`;
+          params = [newGroupId, oldGroupId];
+        }
+        const info = init_12.db.prepare(query).run(...params);
+        return info.changes;
       }
-      static getUnclassifiedPromptCount(type = "positive") {
-        return new Promise((resolve, reject) => {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          init_12.db.get(`SELECT COUNT(*) as count FROM ${tableName} WHERE group_id IS NULL`, [], (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row.count || 0);
-            }
-          });
-        });
+      static async getUnclassifiedPromptCount(type = "positive") {
+        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const row = init_12.db.prepare(`SELECT COUNT(*) as count FROM ${tableName} WHERE group_id IS NULL`).get();
+        return row.count || 0;
       }
       static async getPromptsInGroup(groupId, type = "positive", page = 1, limit = 20) {
         try {
           const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
           const offset = (page - 1) * limit;
-          return new Promise((resolve, reject) => {
-            let countQuery;
-            let countParams;
-            if (groupId === null || groupId === 0) {
-              countQuery = `SELECT COUNT(*) as total FROM ${tableName} WHERE group_id IS NULL`;
-              countParams = [];
-            } else {
-              countQuery = `SELECT COUNT(*) as total FROM ${tableName} WHERE group_id = ?`;
-              countParams = [groupId];
-            }
-            init_12.db.get(countQuery, countParams, (err, countRow) => {
-              if (err) {
-                reject(err);
-                return;
-              }
-              const total = countRow.total;
-              let dataQuery;
-              let dataParams;
-              if (groupId === null || groupId === 0) {
-                dataQuery = `SELECT * FROM ${tableName} WHERE group_id IS NULL ORDER BY usage_count DESC, prompt ASC LIMIT ? OFFSET ?`;
-                dataParams = [limit, offset];
-              } else {
-                dataQuery = `SELECT * FROM ${tableName} WHERE group_id = ? ORDER BY usage_count DESC, prompt ASC LIMIT ? OFFSET ?`;
-                dataParams = [groupId, limit, offset];
-              }
-              init_12.db.all(dataQuery, dataParams, (err2, rows) => {
-                if (err2) {
-                  reject(err2);
-                } else {
-                  resolve({
-                    prompts: rows || [],
-                    total
-                  });
-                }
-              });
-            });
-          });
+          let countQuery;
+          let countParams;
+          if (groupId === null || groupId === 0) {
+            countQuery = `SELECT COUNT(*) as total FROM ${tableName} WHERE group_id IS NULL`;
+            countParams = [];
+          } else {
+            countQuery = `SELECT COUNT(*) as total FROM ${tableName} WHERE group_id = ?`;
+            countParams = [groupId];
+          }
+          const countRow = init_12.db.prepare(countQuery).get(...countParams);
+          const total = countRow.total;
+          let dataQuery;
+          let dataParams;
+          if (groupId === null || groupId === 0) {
+            dataQuery = `SELECT * FROM ${tableName} WHERE group_id IS NULL ORDER BY usage_count DESC, prompt ASC LIMIT ? OFFSET ?`;
+            dataParams = [limit, offset];
+          } else {
+            dataQuery = `SELECT * FROM ${tableName} WHERE group_id = ? ORDER BY usage_count DESC, prompt ASC LIMIT ? OFFSET ?`;
+            dataParams = [groupId, limit, offset];
+          }
+          const rows = init_12.db.prepare(dataQuery).all(...dataParams);
+          return {
+            prompts: rows || [],
+            total
+          };
         } catch (error) {
           console.error("Error getting prompts in group:", error);
           throw error;
@@ -53996,87 +53275,54 @@ var require_promptGroupService = __commonJS({
         try {
           const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
           const groupTableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
-          return new Promise((resolve, reject) => {
-            const groupQuery = `
-          SELECT id, group_name, display_order, is_visible
-          FROM ${groupTableName}
-          WHERE is_visible = 1
-          ORDER BY display_order ASC
+          const groupQuery = `
+        SELECT id, group_name, display_order, is_visible
+        FROM ${groupTableName}
+        WHERE is_visible = 1
+        ORDER BY display_order ASC
+      `;
+          const groupRows = init_12.db.prepare(groupQuery).all();
+          const groups = [];
+          for (const group of groupRows) {
+            const promptQuery = `
+          SELECT id, prompt, usage_count, synonyms
+          FROM ${tableName}
+          WHERE group_id = ?
+          ORDER BY usage_count DESC, prompt ASC
         `;
-            init_12.db.all(groupQuery, [], (err, groupRows) => {
-              if (err) {
-                reject(err);
-                return;
-              }
-              const groups = [];
-              let completedQueries = 0;
-              const totalQueries = groupRows.length + 1;
-              groupRows.forEach((group) => {
-                const promptQuery = `
-              SELECT id, prompt, usage_count, synonyms
-              FROM ${tableName}
-              WHERE group_id = ?
-              ORDER BY usage_count DESC, prompt ASC
-            `;
-                init_12.db.all(promptQuery, [group.id], (err2, promptRows) => {
-                  if (err2) {
-                    reject(err2);
-                    return;
-                  }
-                  const prompts = promptRows.map((row) => ({
-                    id: row.id,
-                    prompt: row.prompt,
-                    usage_count: row.usage_count,
-                    synonyms: row.synonyms ? JSON.parse(row.synonyms) : void 0
-                  }));
-                  groups.push({
-                    id: group.id,
-                    group_name: group.group_name,
-                    display_order: group.display_order,
-                    is_visible: group.is_visible,
-                    prompts
-                  });
-                  completedQueries++;
-                  if (completedQueries === totalQueries) {
-                    groups.sort((a, b) => a.display_order - b.display_order);
-                    finishQuery();
-                  }
-                });
-              });
-              let unclassifiedPrompts = [];
-              const unclassifiedQuery = `
-            SELECT id, prompt, usage_count, synonyms
-            FROM ${tableName}
-            WHERE group_id IS NULL
-            ORDER BY usage_count DESC, prompt ASC
-          `;
-              init_12.db.all(unclassifiedQuery, [], (err2, unclassifiedRows) => {
-                if (err2) {
-                  reject(err2);
-                  return;
-                }
-                unclassifiedPrompts = unclassifiedRows.map((row) => ({
-                  id: row.id,
-                  prompt: row.prompt,
-                  usage_count: row.usage_count,
-                  synonyms: row.synonyms ? JSON.parse(row.synonyms) : void 0
-                }));
-                completedQueries++;
-                if (completedQueries === totalQueries) {
-                  finishQuery();
-                }
-              });
-              function finishQuery() {
-                resolve({
-                  groups,
-                  unclassified_prompts: unclassifiedPrompts
-                });
-              }
-              if (groupRows.length === 0) {
-                completedQueries = totalQueries - 1;
-              }
+            const promptRows = init_12.db.prepare(promptQuery).all(group.id);
+            const prompts = promptRows.map((row) => ({
+              id: row.id,
+              prompt: row.prompt,
+              usage_count: row.usage_count,
+              synonyms: row.synonyms ? JSON.parse(row.synonyms) : void 0
+            }));
+            groups.push({
+              id: group.id,
+              group_name: group.group_name,
+              display_order: group.display_order,
+              is_visible: group.is_visible,
+              prompts
             });
-          });
+          }
+          const unclassifiedQuery = `
+        SELECT id, prompt, usage_count, synonyms
+        FROM ${tableName}
+        WHERE group_id IS NULL
+        ORDER BY usage_count DESC, prompt ASC
+      `;
+          const unclassifiedRows = init_12.db.prepare(unclassifiedQuery).all();
+          const unclassifiedPrompts = unclassifiedRows.map((row) => ({
+            id: row.id,
+            prompt: row.prompt,
+            usage_count: row.usage_count,
+            synonyms: row.synonyms ? JSON.parse(row.synonyms) : void 0
+          }));
+          groups.sort((a, b) => a.display_order - b.display_order);
+          return {
+            groups,
+            unclassified_prompts: unclassifiedPrompts
+          };
         } catch (error) {
           console.error("Error getting grouped prompts:", error);
           throw error;
@@ -54372,322 +53618,184 @@ var require_Group = __commonJS({
     exports2.ImageGroupModel = exports2.GroupModel = void 0;
     var init_12 = require_init2();
     var GroupModel = class {
-      static create(groupData) {
-        return new Promise((resolve, reject) => {
-          const conditionsJson = groupData.auto_collect_conditions ? JSON.stringify(groupData.auto_collect_conditions) : null;
-          const stmt = init_12.db.prepare(`
-        INSERT INTO groups (
-          name, description, color, parent_id,
-          auto_collect_enabled, auto_collect_conditions
-        ) VALUES (?, ?, ?, ?, ?, ?)
-      `);
-          stmt.run([
-            groupData.name,
-            groupData.description || null,
-            groupData.color || null,
-            groupData.parent_id || null,
-            groupData.auto_collect_enabled ? 1 : 0,
-            conditionsJson
-          ], function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.lastID);
-            }
-          });
-          stmt.finalize();
-        });
+      static async create(groupData) {
+        const conditionsJson = groupData.auto_collect_conditions ? JSON.stringify(groupData.auto_collect_conditions) : null;
+        const info = init_12.db.prepare(`
+      INSERT INTO groups (
+        name, description, color, parent_id,
+        auto_collect_enabled, auto_collect_conditions
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `).run(groupData.name, groupData.description || null, groupData.color || null, groupData.parent_id || null, groupData.auto_collect_enabled ? 1 : 0, conditionsJson);
+        return info.lastInsertRowid;
       }
-      static findById(id) {
-        return new Promise((resolve, reject) => {
-          init_12.db.get("SELECT * FROM groups WHERE id = ?", [id], (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row || null);
-            }
-          });
-        });
+      static async findById(id) {
+        const row = init_12.db.prepare("SELECT * FROM groups WHERE id = ?").get(id);
+        return row || null;
       }
-      static findAllWithStats() {
-        return new Promise((resolve, reject) => {
-          const query = `
-        SELECT
-          g.*,
-          COUNT(ig.id) as image_count,
-          COUNT(CASE WHEN ig.collection_type = 'auto' THEN 1 END) as auto_collected_count,
-          COUNT(CASE WHEN ig.collection_type = 'manual' THEN 1 END) as manual_added_count
-        FROM groups g
-        LEFT JOIN image_groups ig ON g.id = ig.group_id
-        GROUP BY g.id
-        ORDER BY g.created_date DESC
-      `;
-          init_12.db.all(query, (err, rows) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(rows || []);
-            }
-          });
-        });
+      static async findAllWithStats() {
+        const query = `
+      SELECT
+        g.*,
+        COUNT(ig.id) as image_count,
+        COUNT(CASE WHEN ig.collection_type = 'auto' THEN 1 END) as auto_collected_count,
+        COUNT(CASE WHEN ig.collection_type = 'manual' THEN 1 END) as manual_added_count
+      FROM groups g
+      LEFT JOIN image_groups ig ON g.id = ig.group_id
+      GROUP BY g.id
+      ORDER BY g.created_date DESC
+    `;
+        const rows = init_12.db.prepare(query).all();
+        return rows || [];
       }
-      static findAutoCollectEnabled() {
-        return new Promise((resolve, reject) => {
-          init_12.db.all("SELECT * FROM groups WHERE auto_collect_enabled = 1 ORDER BY id", (err, rows) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(rows || []);
-            }
-          });
-        });
+      static async findAutoCollectEnabled() {
+        const rows = init_12.db.prepare("SELECT * FROM groups WHERE auto_collect_enabled = 1 ORDER BY id").all();
+        return rows || [];
       }
-      static update(id, groupData) {
-        return new Promise((resolve, reject) => {
-          const fields = [];
-          const values = [];
-          if (groupData.name !== void 0) {
-            fields.push("name = ?");
-            values.push(groupData.name);
-          }
-          if (groupData.description !== void 0) {
-            fields.push("description = ?");
-            values.push(groupData.description);
-          }
-          if (groupData.color !== void 0) {
-            fields.push("color = ?");
-            values.push(groupData.color);
-          }
-          if (groupData.parent_id !== void 0) {
-            fields.push("parent_id = ?");
-            values.push(groupData.parent_id);
-          }
-          if (groupData.auto_collect_enabled !== void 0) {
-            fields.push("auto_collect_enabled = ?");
-            values.push(groupData.auto_collect_enabled ? 1 : 0);
-          }
-          if (groupData.auto_collect_conditions !== void 0) {
-            fields.push("auto_collect_conditions = ?");
-            values.push(groupData.auto_collect_conditions ? JSON.stringify(groupData.auto_collect_conditions) : null);
-          }
-          if (fields.length === 0) {
-            resolve(false);
-            return;
-          }
-          fields.push("updated_date = CURRENT_TIMESTAMP");
-          values.push(id);
-          const query = `UPDATE groups SET ${fields.join(", ")} WHERE id = ?`;
-          init_12.db.run(query, values, function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.changes > 0);
-            }
-          });
-        });
+      static async update(id, groupData) {
+        const fields = [];
+        const values = [];
+        if (groupData.name !== void 0) {
+          fields.push("name = ?");
+          values.push(groupData.name);
+        }
+        if (groupData.description !== void 0) {
+          fields.push("description = ?");
+          values.push(groupData.description);
+        }
+        if (groupData.color !== void 0) {
+          fields.push("color = ?");
+          values.push(groupData.color);
+        }
+        if (groupData.parent_id !== void 0) {
+          fields.push("parent_id = ?");
+          values.push(groupData.parent_id);
+        }
+        if (groupData.auto_collect_enabled !== void 0) {
+          fields.push("auto_collect_enabled = ?");
+          values.push(groupData.auto_collect_enabled ? 1 : 0);
+        }
+        if (groupData.auto_collect_conditions !== void 0) {
+          fields.push("auto_collect_conditions = ?");
+          values.push(groupData.auto_collect_conditions ? JSON.stringify(groupData.auto_collect_conditions) : null);
+        }
+        if (fields.length === 0) {
+          return false;
+        }
+        fields.push("updated_date = CURRENT_TIMESTAMP");
+        values.push(id);
+        const query = `UPDATE groups SET ${fields.join(", ")} WHERE id = ?`;
+        const info = init_12.db.prepare(query).run(...values);
+        return info.changes > 0;
       }
-      static delete(id) {
-        return new Promise((resolve, reject) => {
-          init_12.db.run("DELETE FROM image_groups WHERE group_id = ?", [id], (err) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            init_12.db.run("DELETE FROM groups WHERE id = ?", [id], function(err2) {
-              if (err2) {
-                reject(err2);
-              } else {
-                resolve(this.changes > 0);
-              }
-            });
-          });
-        });
+      static async delete(id) {
+        init_12.db.prepare("DELETE FROM image_groups WHERE group_id = ?").run(id);
+        const info = init_12.db.prepare("DELETE FROM groups WHERE id = ?").run(id);
+        return info.changes > 0;
       }
-      static updateAutoCollectLastRun(id) {
-        return new Promise((resolve, reject) => {
-          init_12.db.run("UPDATE groups SET auto_collect_last_run = CURRENT_TIMESTAMP WHERE id = ?", [id], function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.changes > 0);
-            }
-          });
-        });
+      static async updateAutoCollectLastRun(id) {
+        const info = init_12.db.prepare("UPDATE groups SET auto_collect_last_run = CURRENT_TIMESTAMP WHERE id = ?").run(id);
+        return info.changes > 0;
       }
     };
     exports2.GroupModel = GroupModel;
     var ImageGroupModel = class {
-      static addImageToGroup(groupId, imageId, collectionType = "manual", orderIndex = 0) {
-        return new Promise((resolve, reject) => {
-          const autoCollectedDate = collectionType === "auto" ? (/* @__PURE__ */ new Date()).toISOString() : null;
-          const stmt = init_12.db.prepare(`
-        INSERT OR IGNORE INTO image_groups (
-          group_id, image_id, order_index, collection_type, auto_collected_date
-        ) VALUES (?, ?, ?, ?, ?)
-      `);
-          stmt.run([
-            groupId,
-            imageId,
-            orderIndex,
-            collectionType,
-            autoCollectedDate
-          ], function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.lastID);
-            }
-          });
-          stmt.finalize();
-        });
+      static async addImageToGroup(groupId, imageId, collectionType = "manual", orderIndex = 0) {
+        const autoCollectedDate = collectionType === "auto" ? (/* @__PURE__ */ new Date()).toISOString() : null;
+        const info = init_12.db.prepare(`
+      INSERT OR IGNORE INTO image_groups (
+        group_id, image_id, order_index, collection_type, auto_collected_date
+      ) VALUES (?, ?, ?, ?, ?)
+    `).run(groupId, imageId, orderIndex, collectionType, autoCollectedDate);
+        return info.lastInsertRowid;
       }
-      static removeImageFromGroup(groupId, imageId) {
-        return new Promise((resolve, reject) => {
-          init_12.db.run("DELETE FROM image_groups WHERE group_id = ? AND image_id = ?", [groupId, imageId], function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.changes > 0);
-            }
-          });
-        });
+      static async removeImageFromGroup(groupId, imageId) {
+        const info = init_12.db.prepare("DELETE FROM image_groups WHERE group_id = ? AND image_id = ?").run(groupId, imageId);
+        return info.changes > 0;
       }
-      static removeAutoCollectedImages(groupId) {
-        return new Promise((resolve, reject) => {
-          init_12.db.run("DELETE FROM image_groups WHERE group_id = ? AND collection_type = ?", [groupId, "auto"], function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.changes);
-            }
-          });
-        });
+      static async removeAutoCollectedImages(groupId) {
+        const info = init_12.db.prepare("DELETE FROM image_groups WHERE group_id = ? AND collection_type = ?").run(groupId, "auto");
+        return info.changes;
       }
-      static findImagesByGroup(groupId, page = 1, limit = 20, collectionType) {
-        return new Promise((resolve, reject) => {
-          const offset = (page - 1) * limit;
-          let whereClause = "WHERE ig.group_id = ?";
-          let queryParams = [groupId];
-          if (collectionType) {
-            whereClause += " AND ig.collection_type = ?";
-            queryParams.push(collectionType);
-          }
-          init_12.db.get(`SELECT COUNT(*) as total FROM image_groups ig ${whereClause}`, queryParams, (err, countRow) => {
-            if (err) {
-              reject(err);
-              return;
-            }
-            const total = countRow.total;
-            const query = `
-            SELECT
-              i.*,
-              ig.collection_type,
-              ig.added_date,
-              ig.auto_collected_date,
-              ig.order_index,
-              GROUP_CONCAT(g2.id) as group_ids,
-              GROUP_CONCAT(g2.name) as group_names,
-              GROUP_CONCAT(g2.color) as group_colors,
-              GROUP_CONCAT(ig2.collection_type) as collection_types
-            FROM image_groups ig
-            INNER JOIN images i ON ig.image_id = i.id
-            LEFT JOIN image_groups ig2 ON i.id = ig2.image_id
-            LEFT JOIN groups g2 ON ig2.group_id = g2.id
-            ${whereClause}
-            GROUP BY i.id, ig.collection_type, ig.added_date, ig.auto_collected_date, ig.order_index
-            ORDER BY ig.order_index ASC, ig.added_date DESC
-            LIMIT ? OFFSET ?
-          `;
-            init_12.db.all(query, [...queryParams, limit, offset], (err2, rows) => {
-              if (err2) {
-                reject(err2);
-              } else {
-                const enrichedImages = rows.map((row) => ({
-                  ...row,
-                  groups: row.group_names ? row.group_names.split(",").map((name, index) => ({
-                    id: parseInt(row.group_ids.split(",")[index]),
-                    name,
-                    color: row.group_colors.split(",")[index] || null,
-                    collection_type: row.collection_types.split(",")[index]
-                  })) : []
-                }));
-                resolve({ images: enrichedImages, total });
-              }
-            });
-          });
-        });
+      static async findImagesByGroup(groupId, page = 1, limit = 20, collectionType) {
+        const offset = (page - 1) * limit;
+        let whereClause = "WHERE ig.group_id = ?";
+        let queryParams = [groupId];
+        if (collectionType) {
+          whereClause += " AND ig.collection_type = ?";
+          queryParams.push(collectionType);
+        }
+        const countRow = init_12.db.prepare(`SELECT COUNT(*) as total FROM image_groups ig ${whereClause}`).get(...queryParams);
+        const total = countRow.total;
+        const query = `
+      SELECT
+        i.*,
+        ig.collection_type,
+        ig.added_date,
+        ig.auto_collected_date,
+        ig.order_index,
+        GROUP_CONCAT(g2.id) as group_ids,
+        GROUP_CONCAT(g2.name) as group_names,
+        GROUP_CONCAT(g2.color) as group_colors,
+        GROUP_CONCAT(ig2.collection_type) as collection_types
+      FROM image_groups ig
+      INNER JOIN images i ON ig.image_id = i.id
+      LEFT JOIN image_groups ig2 ON i.id = ig2.image_id
+      LEFT JOIN groups g2 ON ig2.group_id = g2.id
+      ${whereClause}
+      GROUP BY i.id, ig.collection_type, ig.added_date, ig.auto_collected_date, ig.order_index
+      ORDER BY ig.order_index ASC, ig.added_date DESC
+      LIMIT ? OFFSET ?
+    `;
+        const rows = init_12.db.prepare(query).all(...queryParams, limit, offset);
+        const enrichedImages = rows.map((row) => ({
+          ...row,
+          groups: row.group_names ? row.group_names.split(",").map((name, index) => ({
+            id: parseInt(row.group_ids.split(",")[index]),
+            name,
+            color: row.group_colors.split(",")[index] || null,
+            collection_type: row.collection_types.split(",")[index]
+          })) : []
+        }));
+        return { images: enrichedImages, total };
       }
-      static findGroupsByImage(imageId) {
-        return new Promise((resolve, reject) => {
-          const query = `
-        SELECT ig.*, g.name as group_name
-        FROM image_groups ig
-        INNER JOIN groups g ON ig.group_id = g.id
-        WHERE ig.image_id = ?
-        ORDER BY ig.added_date DESC
-      `;
-          init_12.db.all(query, [imageId], (err, rows) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(rows || []);
-            }
-          });
-        });
+      static async findGroupsByImage(imageId) {
+        const query = `
+      SELECT ig.*, g.name as group_name
+      FROM image_groups ig
+      INNER JOIN groups g ON ig.group_id = g.id
+      WHERE ig.image_id = ?
+      ORDER BY ig.added_date DESC
+    `;
+        const rows = init_12.db.prepare(query).all(imageId);
+        return rows || [];
       }
-      static isImageInGroup(groupId, imageId) {
-        return new Promise((resolve, reject) => {
-          init_12.db.get("SELECT 1 FROM image_groups WHERE group_id = ? AND image_id = ?", [groupId, imageId], (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(!!row);
-            }
-          });
-        });
+      static async isImageInGroup(groupId, imageId) {
+        const row = init_12.db.prepare("SELECT 1 FROM image_groups WHERE group_id = ? AND image_id = ?").get(groupId, imageId);
+        return !!row;
       }
-      static getCollectionType(groupId, imageId) {
-        return new Promise((resolve, reject) => {
-          init_12.db.get("SELECT collection_type FROM image_groups WHERE group_id = ? AND image_id = ?", [groupId, imageId], (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row ? row.collection_type : null);
-            }
-          });
-        });
+      static async getCollectionType(groupId, imageId) {
+        const row = init_12.db.prepare("SELECT collection_type FROM image_groups WHERE group_id = ? AND image_id = ?").get(groupId, imageId);
+        return row ? row.collection_type : null;
       }
-      static convertToManual(groupId, imageId) {
-        return new Promise((resolve, reject) => {
-          init_12.db.run(`UPDATE image_groups
-         SET collection_type = 'manual', auto_collected_date = NULL
-         WHERE group_id = ? AND image_id = ? AND collection_type = 'auto'`, [groupId, imageId], function(err) {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(this.changes > 0);
-            }
-          });
-        });
+      static async convertToManual(groupId, imageId) {
+        const info = init_12.db.prepare(`
+      UPDATE image_groups
+      SET collection_type = 'manual', auto_collected_date = NULL
+      WHERE group_id = ? AND image_id = ? AND collection_type = 'auto'
+    `).run(groupId, imageId);
+        return info.changes > 0;
       }
-      static findRandomImageForGroup(groupId) {
-        return new Promise((resolve, reject) => {
-          const query = `
-        SELECT i.id, i.filename, i.thumbnail_path, i.file_path
-        FROM image_groups ig
-        INNER JOIN images i ON ig.image_id = i.id
-        WHERE ig.group_id = ?
-        ORDER BY RANDOM()
-        LIMIT 1
-      `;
-          init_12.db.get(query, [groupId], (err, row) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(row || null);
-            }
-          });
-        });
+      static async findRandomImageForGroup(groupId) {
+        const query = `
+      SELECT i.id, i.filename, i.thumbnail_path, i.file_path
+      FROM image_groups ig
+      INNER JOIN images i ON ig.image_id = i.id
+      WHERE ig.group_id = ?
+      ORDER BY RANDOM()
+      LIMIT 1
+    `;
+        const row = init_12.db.prepare(query).get(groupId);
+        return row || null;
       }
     };
     exports2.ImageGroupModel = ImageGroupModel;

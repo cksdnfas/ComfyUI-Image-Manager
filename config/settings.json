@@ -1,11 +1,11 @@
 {
   "tagger": {
-    "enabled": false,
+    "enabled": true,
     "model": "vit",
     "generalThreshold": 0.35,
     "characterThreshold": 0.75,
     "pythonPath": "python",
-    "autoTagOnUpload": false,
+    "autoTagOnUpload": true,
     "keepModelLoaded": false,
     "autoUnloadMinutes": 5
   }
