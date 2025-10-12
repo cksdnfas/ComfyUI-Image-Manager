@@ -1,5 +1,5 @@
 // ComfyUI Image Manager - Bundled Backend
-// Generated: 2025-10-12T09:27:53.184Z
+// Generated: 2025-10-12T11:38:41.324Z
 // Node.js v22.17.1
 
 "use strict";

@@ -54,10 +54,10 @@ const up = async (db) => {
                 console.log('✅ rating_tiers 테이블 생성 완료');
             });
             const defaultTiers = [
-                { tier_name: '전체이용가', min_score: 0, max_score: 2, tier_order: 1, color: '#22c55e' },
-                { tier_name: '12세', min_score: 2, max_score: 6, tier_order: 2, color: '#3b82f6' },
-                { tier_name: '청소년불가', min_score: 6, max_score: 15, tier_order: 3, color: '#f59e0b' },
-                { tier_name: '후방주의', min_score: 15, max_score: null, tier_order: 4, color: '#ef4444' }
+                { tier_name: 'G', min_score: 0, max_score: 2, tier_order: 1, color: '#22c55e' },
+                { tier_name: 'Teen', min_score: 2, max_score: 6, tier_order: 2, color: '#3b82f6' },
+                { tier_name: 'SFW', min_score: 6, max_score: 15, tier_order: 3, color: '#f59e0b' },
+                { tier_name: 'NSFW', min_score: 15, max_score: null, tier_order: 4, color: '#ef4444' }
             ];
             let insertedCount = 0;
             defaultTiers.forEach((tier) => {

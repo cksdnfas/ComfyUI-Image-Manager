@@ -2,6 +2,33 @@
 
 ## 🚀 Quick Start
 
+### First Run (Automatic Setup)
+
+**Important:** On first run, the application will automatically download required dependencies.
+- This requires an internet connection (one-time only)
+- Takes 1-2 minutes depending on your connection speed
+- Dependencies are cached for future runs
+
+### Windows
+1. Double-click `start.bat`
+2. Wait for automatic dependency installation (first run only)
+3. Server will start automatically after setup
+4. Open your browser to the URL displayed
+
+### Linux/Mac
+1. Open terminal in this directory
+2. Run: `chmod +x start.sh` (first time only)
+3. Run: `./start.sh`
+4. Wait for automatic dependency installation (first run only)
+5. Open your browser to the URL displayed
+
+### Offline Usage
+
+If you need to use this in an offline environment:
+1. Run once with internet connection to download dependencies
+2. After first successful run, no internet is required
+3. The `app/node_modules/` folder contains all required dependencies
+
 ### Prerequisites (Optional - for WD v3 Tagger feature)
 
 If you want to use the AI tagging feature, install Python dependencies:
@@ -11,16 +38,6 @@ pip install -r app/python/requirements.txt
 ```
 
 **Note:** The application works without Python - tagging is an optional feature.
-
-### Windows
-1. Double-click `start.bat`
-2. Wait for the server to start (console window will open)
-3. Open your browser to the URL displayed
-
-### Linux/Mac
-1. Open terminal in this directory
-2. Run: `./start.sh`
-3. Open your browser to the URL displayed
 
 ## 📝 Configuration
 
@@ -84,6 +101,12 @@ Change PORT in `.env` file
 - Check logs/ folder for error messages
 - Ensure all files are present (app/, node.exe/node)
 
+### Dependencies not downloading
+- Ensure you have internet connection (first run only)
+- Check if npm is accessible: `npm --version`
+- If npm is not found, install Node.js from https://nodejs.org/
+- Manually install: `cd app && npm install --production`
+
 ### Cannot access from other devices
 - Ensure HOST=0.0.0.0 in `.env`
 - Check firewall settings
@@ -118,15 +141,30 @@ Visit: https://github.com/yourusername/comfyui-image-manager
 ## 💡 Tips
 
 - Keep this folder together - don't move individual files
-- The app folder contains all necessary dependencies
-- No Node.js installation required on the system
-- Portable - can be moved to any location
+- **First run requires internet** for automatic dependency download
+- After first run, works completely offline
+- The app folder contains all necessary dependencies after setup
+- Portable - can be moved to any location after first run
 - Python is optional - only needed for AI tagging feature
 - Models are downloaded once and cached in `models/` folder
+
+## 🔄 How Auto-Download Works
+
+1. **First Run**: `start.bat`/`start.sh` runs `bootstrap.js`
+2. **Dependency Check**: Verifies if native modules (sharp, sqlite3) are present
+3. **Auto-Install**: If missing, automatically runs `npm install` in `app/` folder
+4. **Caching**: Downloaded modules are saved in `app/node_modules/`
+5. **Subsequent Runs**: No download needed, starts immediately
+
+This approach allows:
+- ✅ Smaller Git repository size (no node_modules committed)
+- ✅ Automatic platform-specific binary download
+- ✅ Works on Windows, Linux, and Mac
+- ✅ Offline usage after first run
 
 ---
 
 **Version:** 1.0.0
 **Platform:** win32 x64
 **Node.js:** v22.17.1
-**Built:** 2025-10-12T09:27:54.025Z
+**Built:** 2025-10-12T11:38:42.056Z
