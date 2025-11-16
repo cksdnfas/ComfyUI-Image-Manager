@@ -1,0 +1,275 @@
+# ComfyUI Image Manager - Docker Compose Configuration Examples
+#
+# This file contains various configuration examples for different use cases.
+# Copy the example you need to docker-compose.yml or docker-compose.override.yml
+
+# ============================================================================
+# Example 1: Simple Named Volume (Default - Recommended for most users)
+# ============================================================================
+# This is the default configuration. Docker manages the volume automatically.
+# Data location varies by platform:
+#   - Linux: /var/lib/docker/volumes/comfyui-data/_data
+#   - Windows: \\wsl$\docker-desktop-data\data\docker\volumes\comfyui-data\_data
+#   - macOS: ~/Library/Containers/com.docker.docker/Data/vms/0/
+
+# services:
+#   comfyui-manager:
+#     image: comfyui-image-manager:latest
+#     container_name: comfyui-manager
+#     ports:
+#       - "1566:1566"
+#     volumes:
+#       - comfyui-data:/app/data
+#     environment:
+#       - NODE_ENV=production
+#       - LOCALE=en
+#     restart: unless-stopped
+#
+# volumes:
+#   comfyui-data:
+
+# ============================================================================
+# Example 2: Bind Mount to Specific Host Directory
+# ============================================================================
+# Use this when you want direct access to files from your host system.
+# Good for development or when you want to easily browse/backup files.
+
+# Linux/macOS Example:
+# services:
+#   comfyui-manager:
+#     image: comfyui-image-manager:latest
+#     container_name: comfyui-manager
+#     ports:
+#       - "1566:1566"
+#     volumes:
+#       - /home/user/comfyui-data:/app/data
+#     environment:
+#       - NODE_ENV=production
+#     restart: unless-stopped
+
+# Windows Example (Docker Desktop):
+# services:
+#   comfyui-manager:
+#     image: comfyui-image-manager:latest
+#     container_name: comfyui-manager
+#     ports:
+#       - "1566:1566"
+#     volumes:
+#       - D:/comfyui-data:/app/data
+#     environment:
+#       - NODE_ENV=production
+#       - LOCALE=ko
+#     restart: unless-stopped
+
+# Windows WSL2 Example:
+# services:
+#   comfyui-manager:
+#     image: comfyui-image-manager:latest
+#     container_name: comfyui-manager
+#     ports:
+#       - "1566:1566"
+#     volumes:
+#       - /mnt/d/comfyui-data:/app/data
+#     environment:
+#       - NODE_ENV=production
+#     restart: unless-stopped
+
+# ============================================================================
+# Example 3: External Image Library with Path Override
+# ============================================================================
+# Use this when you have an existing image collection you want to import.
+# The app data (database, logs) stays in a Docker volume, while images
+# are read from an external directory.
+
+# services:
+#   comfyui-manager:
+#     image: comfyui-image-manager:latest
+#     container_name: comfyui-manager
+#     ports:
+#       - "1566:1566"
+#     volumes:
+#       # Application data in Docker volume
+#       - comfyui-app-data:/app/data
+#       # External image library (can be read-only)
+#       - /mnt/nas/ai-images:/data/external-images:ro
+#     environment:
+#       - NODE_ENV=production
+#       # Override uploads directory to external storage
+#       - RUNTIME_UPLOADS_DIR=/data/external-images
+#       # Other paths remain in /app/data
+#     restart: unless-stopped
+#
+# volumes:
+#   comfyui-app-data:
+
+# ============================================================================
+# Example 4: Separate Volumes for Each Data Type
+# ============================================================================
+# Use this for fine-grained control over where each type of data is stored.
+# Useful for advanced setups with different storage backends.
+
+# services:
+#   comfyui-manager:
+#     image: comfyui-image-manager:latest
+#     container_name: comfyui-manager
+#     ports:
+#       - "1566:1566"
+#     volumes:
+#       # Large files on external storage
+#       - /mnt/storage/images:/data/uploads
+#       - /mnt/storage/models:/data/models
+#       # System data in Docker volumes
+#       - comfyui-database:/data/database
+#       - comfyui-config:/data/config
+#       # Temporary data (can be ephemeral)
+#       - comfyui-temp:/data/temp
+#     environment:
+#       - NODE_ENV=production
+#       - RUNTIME_UPLOADS_DIR=/data/uploads
+#       - RUNTIME_DATABASE_DIR=/data/database
+#       - RUNTIME_LOGS_DIR=/data/database/logs
+#       - RUNTIME_TEMP_DIR=/data/temp
+#       - RUNTIME_MODELS_DIR=/data/models
+#       - RUNTIME_RECYCLE_BIN_DIR=/data/uploads/RecycleBin
+#     restart: unless-stopped
+#
+# volumes:
+#   comfyui-database:
+#   comfyui-config:
+#   comfyui-temp:
+
+# ============================================================================
+# Example 5: NFS/Network Storage
+# ============================================================================
+# Use this when you want to store data on a network file server (NFS).
+# Good for shared storage in multi-server setups.
+
+# services:
+#   comfyui-manager:
+#     image: comfyui-image-manager:latest
+#     container_name: comfyui-manager
+#     ports:
+#       - "1566:1566"
+#     volumes:
+#       - nfs-storage:/app/data
+#     environment:
+#       - NODE_ENV=production
+#     restart: unless-stopped
+#
+# volumes:
+#   nfs-storage:
+#     driver: local
+#     driver_opts:
+#       type: nfs
+#       o: addr=192.168.1.100,rw,nfsvers=4
+#       device: ":/path/to/nfs/share"
+
+# ============================================================================
+# Example 6: Development Setup with Live Code Reload
+# ============================================================================
+# Use this for local development. Mounts source code for live editing.
+# Run this with: docker-compose -f docker-compose.dev.yml up
+
+# services:
+#   comfyui-manager-dev:
+#     build:
+#       context: ../..
+#       dockerfile: build-output/docker/Dockerfile
+#     container_name: comfyui-manager-dev
+#     ports:
+#       - "1566:1566"
+#     volumes:
+#       # Bind mount for development
+#       - ../../dev-data:/app/data
+#       # Optional: Mount source code for debugging
+#       # - ../../backend/src:/app/src:ro
+#     environment:
+#       - NODE_ENV=development
+#       - PORT=1566
+#       - LOCALE=ko
+#       - DEBUG=*
+#     restart: unless-stopped
+#     # Enable TTY for better logging
+#     stdin_open: true
+#     tty: true
+
+# ============================================================================
+# Example 7: Custom Port and Environment Settings
+# ============================================================================
+# Use this to run multiple instances or change default settings.
+
+# services:
+#   comfyui-manager-custom:
+#     image: comfyui-image-manager:latest
+#     container_name: comfyui-manager-8080
+#     ports:
+#       - "8080:1566"  # Expose on host port 8080
+#     volumes:
+#       - comfyui-data-8080:/app/data
+#     environment:
+#       - NODE_ENV=production
+#       - PORT=1566  # Internal container port (don't change)
+#       - HOST=0.0.0.0
+#       - LOCALE=ko
+#       # Add custom environment variables here
+#     restart: unless-stopped
+#
+# volumes:
+#   comfyui-data-8080:
+
+# ============================================================================
+# Example 8: Resource Limits and Security
+# ============================================================================
+# Use this in production to limit resource usage and enhance security.
+
+# services:
+#   comfyui-manager-production:
+#     image: comfyui-image-manager:latest
+#     container_name: comfyui-manager-prod
+#     ports:
+#       - "1566:1566"
+#     volumes:
+#       - comfyui-data:/app/data
+#     environment:
+#       - NODE_ENV=production
+#       - LOCALE=en
+#     restart: unless-stopped
+#     # Resource limits
+#     deploy:
+#       resources:
+#         limits:
+#           cpus: '2'
+#           memory: 2G
+#         reservations:
+#           cpus: '0.5'
+#           memory: 512M
+#     # Security options
+#     security_opt:
+#       - no-new-privileges:true
+#     # Read-only root filesystem (if applicable)
+#     # read_only: true
+#     # tmpfs:
+#     #   - /tmp
+#
+# volumes:
+#   comfyui-data:
+
+# ============================================================================
+# Notes
+# ============================================================================
+#
+# Volume Backup:
+#   docker run --rm -v comfyui-data:/data -v $(pwd):/backup \
+#     alpine tar czf /backup/backup.tar.gz -C /data .
+#
+# Volume Restore:
+#   docker run --rm -v comfyui-data:/data -v $(pwd):/backup \
+#     alpine tar xzf /backup/backup.tar.gz -C /data
+#
+# View Volume Location:
+#   docker volume inspect comfyui-data
+#
+# Remove Unused Volumes:
+#   docker volume prune
+#
+# For more information, see README.md

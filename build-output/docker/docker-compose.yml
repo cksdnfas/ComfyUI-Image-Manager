@@ -1,0 +1,77 @@
+# ComfyUI Image Manager - Docker Compose Configuration
+#
+# This configuration uses a single named volume for all application data,
+# making it easier to manage, backup, and upgrade.
+#
+# All data is stored in the 'comfyui-data' volume, which includes:
+#   - uploads/      (original images and thumbnails)
+#   - database/     (SQLite database)
+#   - logs/         (application logs)
+#   - temp/         (temporary files and generated thumbnails)
+#   - models/       (AI model cache)
+#   - config/       (settings and configuration)
+#   - RecycleBin/   (deleted files, if delete protection is enabled)
+
+services:
+  comfyui-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: comfyui-image-manager
+
+    # Host 네트워크 모드 (네트워크 드라이브 접근 필요 시)
+    # 주의: Windows/Mac에서는 제한적 지원, Linux에서만 완벽 작동
+    # 활성화 시: 컨테이너가 호스트의 네트워크를 직접 사용 (포트 매핑 불필요)
+    # 접속: http://localhost:1566 (포트는 동일, 매핑만 생략)
+    # network_mode: "host"
+
+    # ports 섹션 (host 모드 사용 시 주석 처리)
+    ports:
+      - "1566:1566"
+
+    # Single volume for all application data
+    volumes:
+      - comfyui-data:/app/data
+
+      # Alternative: Use bind mount to a specific host directory
+      # Uncomment and modify the path below to use a host directory instead:
+      # - /path/to/your/data:/app/data
+      #
+      # Examples:
+      #   Linux/macOS:  - /home/user/comfyui-data:/app/data
+      #   Windows WSL:  - /mnt/d/comfyui-data:/app/data
+      #   Windows:      - D:/comfyui-data:/app/data
+      #
+      # If using bind mount, comment out the 'volumes:' section at the bottom
+
+      # Windows 네트워크 드라이브 마운트 (UNC 경로)
+      # 네트워크 공유 폴더를 컨테이너에 마운트하여 접근 가능
+      # 예시: - "\\\\192.168.50.11\\Share\\Images:/network-images:ro"
+      # 주의: Docker Desktop에서만 작동, Linux는 CIFS 마운트 필요
+
+    environment:
+      - NODE_ENV=production
+      - PORT=1566
+      - HOST=0.0.0.0
+      - LOCALE=en
+      # All data paths are automatically configured via RUNTIME_BASE_PATH=/app/data
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:1566/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+# Named volume for persistent data storage
+# Docker manages this volume automatically
+volumes:
+  comfyui-data:
+    # Optional: Specify driver options for advanced configurations
+    # driver: local
+    # driver_opts:
+    #   type: none
+    #   o: bind
+    #   device: /path/to/host/directory

@@ -1,0 +1,42 @@
+# Claude Code settings
+.claude/
+
+# Node modules
+node_modules/
+build-output/portable/app/node_modules/
+build-output/docker/node_modules/
+
+# Node.js executable
+build-output/portable/node.exe
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
