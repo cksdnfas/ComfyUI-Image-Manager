@@ -55,19 +55,10 @@ ComfyUI Image Manager is a comprehensive system for managing, analyzing, and org
 This repository provides pre-built packages for easy deployment:
 
 ### 1. Docker Deployment (Recommended)
-```bash
-cd build-output/docker
-docker-compose up -d
-```
 
 See [build-output/docker/README.md](build-output/docker/README.md) for detailed Docker setup instructions.
 
 ### 2. Portable Version
-```bash
-cd build-output/portable
-# Run the application
-node.exe app/bootstrap.js
-```
 
 The portable version includes:
 - Bundled Node.js runtime
@@ -79,50 +70,6 @@ The portable version includes:
 - Node.js 18.0.0 or higher (included in portable version)
 - 4GB RAM or more recommended
 - FFmpeg (for video support)
-
-## Quick Start
-
-### Using Docker (Recommended)
-
-1. Navigate to the docker directory:
-```bash
-cd build-output/docker
-```
-
-2. Configure your environment:
-```bash
-cp .env.example .env
-# Edit .env file with your settings
-```
-
-3. Start the application:
-```bash
-docker-compose up -d
-```
-
-4. Access the web interface at `http://localhost:3000`
-
-### Using Portable Version
-
-1. Navigate to the portable directory:
-```bash
-cd build-output/portable
-```
-
-2. Run the application:
-```bash
-node.exe app/bootstrap.js
-```
-
-3. Access the web interface at `http://localhost:3000`
-
-## Default Login
-
-On first run, an admin account is automatically created:
-- **Username**: admin
-- **Password**: admin
-
-Please change the password immediately after first login.
 
 ## Security
 
