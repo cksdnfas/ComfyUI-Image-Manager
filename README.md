@@ -1,4 +1,4 @@
-# ComfyUI Image Manager v2.0.0-alpha
+# ComfyUI Image Manager v2.0.1a
 
 AI Image Management and Analysis System for ComfyUI
 
@@ -150,5 +150,5 @@ Personal Project
 ---
 
 **Author**: cksdnfas
-**Version**: 2.0.0-alpha
+**Version**: 2.0.1a
 **Repository**: https://github.com/cksdnfas/ComfyUI-Image-Manager

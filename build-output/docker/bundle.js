@@ -1,5 +1,5 @@
 // ComfyUI Image Manager - Bundled Backend
-// Generated: 2025-11-16T07:59:50.289Z
+// Generated: 2025-11-18T14:56:26.218Z
 // Node.js v22.20.0
 
 "use strict";
@@ -53768,13 +53768,22 @@ var require_novelaiParser = __commonJS({
             aiInfo.positive_prompt = naiData.v4_prompt.caption.base_caption;
             aiInfo.prompt = aiInfo.positive_prompt;
           } else if (naiData.prompt) {
-            aiInfo.positive_prompt = naiData.prompt;
-            aiInfo.prompt = naiData.prompt;
+            if (typeof naiData.prompt === "string") {
+              aiInfo.positive_prompt = naiData.prompt;
+              aiInfo.prompt = naiData.prompt;
+            } else if (typeof naiData.prompt === "object" && naiData.prompt?.caption?.base_caption) {
+              aiInfo.positive_prompt = naiData.prompt.caption.base_caption;
+              aiInfo.prompt = naiData.prompt.caption.base_caption;
+            }
           }
           if (naiData.v4_negative_prompt?.caption?.base_caption) {
             aiInfo.negative_prompt = naiData.v4_negative_prompt.caption.base_caption;
           } else if (naiData.uc) {
-            aiInfo.negative_prompt = naiData.uc;
+            if (typeof naiData.uc === "string") {
+              aiInfo.negative_prompt = naiData.uc;
+            } else if (typeof naiData.uc === "object" && naiData.uc?.caption?.base_caption) {
+              aiInfo.negative_prompt = naiData.uc.caption.base_caption;
+            }
           }
           if (naiData.steps)
             aiInfo.steps = naiData.steps;
@@ -54330,7 +54339,7 @@ var require_metadata = __commonJS({
           const primaryStart = Date.now();
           let aiInfo = await this.primaryExtraction(buffer, filePath, fileExt);
           console.log(`\u23F1\uFE0F [MetadataExtractor] Primary extraction: ${Date.now() - primaryStart}ms`);
-          const hasPrompt = Boolean(aiInfo.prompt && aiInfo.prompt.trim() || aiInfo.positive_prompt && aiInfo.positive_prompt.trim());
+          const hasPrompt = Boolean(aiInfo.prompt && typeof aiInfo.prompt === "string" && aiInfo.prompt.trim() || aiInfo.positive_prompt && typeof aiInfo.positive_prompt === "string" && aiInfo.positive_prompt.trim());
           console.log(`\u{1F50D} [MetadataExtractor] Primary extraction result:`, {
             hasPrompt,
             promptLength: aiInfo.prompt?.length || 0,
@@ -64521,7 +64530,16 @@ var require_Group = __commonJS({
         const info = init_12.db.prepare(sql).run(...values);
         return info.changes > 0;
       }
-      static async delete(id) {
+      static async delete(id, cascade = false) {
+        if (cascade) {
+          const hierarchyService = (0, groupHierarchyService_1.getGroupHierarchyService)();
+          const descendants = hierarchyService.getDescendants(id);
+          const sortedDescendants = [...descendants].sort((a, b) => b.depth - a.depth);
+          for (const node of sortedDescendants) {
+            init_12.db.prepare("DELETE FROM image_groups WHERE group_id = ?").run(node.id);
+            init_12.db.prepare("DELETE FROM groups WHERE id = ?").run(node.id);
+          }
+        }
         init_12.db.prepare("DELETE FROM image_groups WHERE group_id = ?").run(id);
         const info = init_12.db.prepare("DELETE FROM groups WHERE id = ?").run(id);
         return info.changes > 0;
@@ -68090,6 +68108,269 @@ var require_negativePromptGroups = __commonJS({
   }
 });
 
+// backend/dist/models/AutoFolderGroup.js
+var require_AutoFolderGroup = __commonJS({
+  "backend/dist/models/AutoFolderGroup.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.AutoFolderGroupImageModel = exports2.AutoFolderGroupModel = void 0;
+    var init_12 = require_init2();
+    var AutoFolderGroupModel = class {
+      static async create(data) {
+        const info = init_12.db.prepare(`
+      INSERT INTO auto_folder_groups (
+        folder_path, absolute_path, display_name, parent_id,
+        depth, has_images, image_count, color
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(data.folder_path, data.absolute_path, data.display_name, data.parent_id ?? null, data.depth, data.has_images ? 1 : 0, data.image_count ?? 0, data.color ?? null);
+        const id = info.lastInsertRowid;
+        const group = await this.findById(id);
+        if (!group) {
+          throw new Error("Failed to create auto folder group");
+        }
+        return group;
+      }
+      static async findById(id) {
+        const row = init_12.db.prepare("SELECT * FROM auto_folder_groups WHERE id = ?").get(id);
+        return row || null;
+      }
+      static async findByFolderPath(folderPath) {
+        const row = init_12.db.prepare("SELECT * FROM auto_folder_groups WHERE folder_path = ?").get(folderPath);
+        return row || null;
+      }
+      static async findRoots() {
+        const query = `
+      SELECT
+        afg.*,
+        (SELECT COUNT(*) FROM auto_folder_groups WHERE parent_id = afg.id) as child_count
+      FROM auto_folder_groups afg
+      WHERE afg.parent_id IS NULL
+      ORDER BY afg.display_name ASC
+    `;
+        const rows = init_12.db.prepare(query).all();
+        return rows || [];
+      }
+      static async findChildren(parentId) {
+        const query = `
+      SELECT
+        afg.*,
+        (SELECT COUNT(*) FROM auto_folder_groups WHERE parent_id = afg.id) as child_count
+      FROM auto_folder_groups afg
+      WHERE afg.parent_id = ?
+      ORDER BY afg.display_name ASC
+    `;
+        const rows = init_12.db.prepare(query).all(parentId);
+        return rows || [];
+      }
+      static async findAllWithStats() {
+        const query = `
+      SELECT
+        afg.*,
+        (SELECT COUNT(*) FROM auto_folder_groups WHERE parent_id = afg.id) as child_count
+      FROM auto_folder_groups afg
+      ORDER BY afg.depth ASC, afg.display_name ASC
+    `;
+        const rows = init_12.db.prepare(query).all();
+        return rows || [];
+      }
+      static async deleteAll() {
+        init_12.db.prepare("DELETE FROM auto_folder_groups").run();
+      }
+      static async delete(id) {
+        const info = init_12.db.prepare("DELETE FROM auto_folder_groups WHERE id = ?").run(id);
+        return info.changes > 0;
+      }
+      static async updateImageCount(id, count) {
+        const info = init_12.db.prepare(`
+      UPDATE auto_folder_groups
+      SET image_count = ?, last_updated = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(count, id);
+        return info.changes > 0;
+      }
+      static async getBreadcrumbPath(groupId) {
+        const path = [];
+        let currentId = groupId;
+        while (currentId !== null) {
+          const group = await this.findById(currentId);
+          if (!group)
+            break;
+          path.unshift({
+            id: group.id,
+            name: group.display_name,
+            folder_path: group.folder_path
+          });
+          currentId = group.parent_id;
+        }
+        return path;
+      }
+    };
+    exports2.AutoFolderGroupModel = AutoFolderGroupModel;
+    var AutoFolderGroupImageModel = class {
+      static async addImageToGroup(groupId, compositeHash) {
+        try {
+          init_12.db.prepare(`
+        INSERT INTO auto_folder_group_images (group_id, composite_hash)
+        VALUES (?, ?)
+      `).run(groupId, compositeHash);
+          return true;
+        } catch (error) {
+          return false;
+        }
+      }
+      static async removeAllImagesFromGroup(groupId) {
+        init_12.db.prepare("DELETE FROM auto_folder_group_images WHERE group_id = ?").run(groupId);
+      }
+      static async findImagesByGroup(groupId, page = 1, pageSize = 50) {
+        const offset = Math.floor((page - 1) * pageSize);
+        try {
+          console.log("[AutoFolderGroup] findImagesByGroup params:", {
+            groupId,
+            groupIdType: typeof groupId,
+            page,
+            pageSize,
+            offset,
+            offsetType: typeof offset
+          });
+          const query = `
+        SELECT m.*,
+        (SELECT id FROM image_files WHERE composite_hash = m.composite_hash AND file_status = 'active' LIMIT 1) as id,
+        (SELECT file_type FROM image_files WHERE composite_hash = m.composite_hash AND file_status = 'active' LIMIT 1) as file_type,
+        (SELECT mime_type FROM image_files WHERE composite_hash = m.composite_hash AND file_status = 'active' LIMIT 1) as mime_type,
+        (SELECT file_size FROM image_files WHERE composite_hash = m.composite_hash AND file_status = 'active' LIMIT 1) as file_size,
+        (SELECT original_file_path FROM image_files WHERE composite_hash = m.composite_hash AND file_status = 'active' LIMIT 1) as original_file_path
+        FROM auto_folder_group_images afgi
+        INNER JOIN media_metadata m ON afgi.composite_hash = m.composite_hash
+        WHERE afgi.group_id = ?
+        ORDER BY m.first_seen_date DESC
+        LIMIT ? OFFSET ?
+      `;
+          const rows = init_12.db.prepare(query).all(groupId, pageSize, offset);
+          console.log("[AutoFolderGroup] findImagesByGroup result:", { rowCount: rows.length });
+          return rows || [];
+        } catch (error) {
+          console.error("[AutoFolderGroup] Error in findImagesByGroup:", {
+            groupId,
+            groupIdType: typeof groupId,
+            page,
+            pageSize,
+            offset,
+            offsetType: typeof offset,
+            error: error instanceof Error ? error.message : error
+          });
+          throw error;
+        }
+      }
+      static async getImageCount(groupId) {
+        const result = init_12.db.prepare(`
+      SELECT COUNT(*) as count
+      FROM auto_folder_group_images
+      WHERE group_id = ?
+    `).get(groupId);
+        return result?.count || 0;
+      }
+      static async findRandomImageForGroup(groupId) {
+        const query = `
+      SELECT m.*
+      FROM auto_folder_group_images afgi
+      INNER JOIN media_metadata m ON afgi.composite_hash = m.composite_hash
+      WHERE afgi.group_id = ?
+      ORDER BY RANDOM()
+      LIMIT 1
+    `;
+        const row = init_12.db.prepare(query).get(groupId);
+        return row || null;
+      }
+      static async findPreviewImages(groupId, count = 8, includeChildren = true) {
+        const query = `
+      SELECT DISTINCT
+        COALESCE(m.composite_hash, afgi.composite_hash) as composite_hash,
+        m.perceptual_hash,
+        m.dhash,
+        m.ahash,
+        m.color_histogram,
+        m.width,
+        m.height,
+        m.thumbnail_path,
+        m.ai_tool,
+        m.model_name,
+        m.lora_models,
+        m.steps,
+        m.cfg_scale,
+        m.sampler,
+        m.seed,
+        m.scheduler,
+        m.prompt,
+        m.negative_prompt,
+        m.denoise_strength,
+        m.generation_time,
+        m.batch_size,
+        m.batch_index,
+        m.auto_tags,
+        m.duration,
+        m.fps,
+        m.video_codec,
+        m.audio_codec,
+        m.bitrate,
+        m.rating_score,
+        m.first_seen_date,
+        m.metadata_updated_date,
+        if.id as file_id,
+        if.original_file_path,
+        if.file_status,
+        if.file_type,
+        if.mime_type,
+        if.folder_id,
+        f.folder_name
+      FROM auto_folder_group_images afgi
+      LEFT JOIN media_metadata m ON afgi.composite_hash = m.composite_hash
+      LEFT JOIN image_files if ON afgi.composite_hash = if.composite_hash
+        AND if.file_status = 'active'
+      LEFT JOIN watched_folders f ON if.folder_id = f.id
+      WHERE afgi.group_id = ?
+      ORDER BY RANDOM()
+      LIMIT ?
+    `;
+        const rows = init_12.db.prepare(query).all(groupId, count);
+        if (rows.length > 0 || !includeChildren) {
+          return rows;
+        }
+        const children = await AutoFolderGroupModel.findChildren(groupId);
+        if (children.length === 0) {
+          return [];
+        }
+        for (const child of children) {
+          const childImages = await this.findPreviewImages(child.id, count, true);
+          if (childImages.length > 0) {
+            return childImages;
+          }
+        }
+        return [];
+      }
+      static async getCompositeHashesForGroup(groupId) {
+        const rows = init_12.db.prepare(`
+      SELECT composite_hash
+      FROM auto_folder_group_images
+      WHERE group_id = ?
+    `).all(groupId);
+        return rows.map((r) => r.composite_hash);
+      }
+      static async findGroupsByImage(compositeHash) {
+        const query = `
+      SELECT afg.*
+      FROM auto_folder_groups afg
+      INNER JOIN auto_folder_group_images afgi ON afg.id = afgi.group_id
+      WHERE afgi.composite_hash = ?
+      ORDER BY afg.folder_path ASC
+    `;
+        const rows = init_12.db.prepare(query).all(compositeHash);
+        return rows || [];
+      }
+    };
+    exports2.AutoFolderGroupImageModel = AutoFolderGroupImageModel;
+  }
+});
+
 // node_modules/adm-zip/util/constants.js
 var require_constants = __commonJS({
   "node_modules/adm-zip/util/constants.js"(exports2, module2) {
@@ -70756,6 +71037,7 @@ var require_groupDownloadService = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.GroupDownloadService = void 0;
     var Group_1 = require_Group();
+    var AutoFolderGroup_1 = require_AutoFolderGroup();
     var runtimePaths_12 = require_runtimePaths();
     var adm_zip_1 = __importDefault2(require_adm_zip());
     var path_12 = __importDefault2(require("path"));
@@ -70763,12 +71045,22 @@ var require_groupDownloadService = __commonJS({
     var os_1 = require("os");
     var GroupDownloadService = class {
       static async createGroupZip(options) {
-        const { groupId, downloadType, compositeHashes } = options;
-        const group = await Group_1.GroupModel.findById(groupId);
-        if (!group) {
-          throw new Error("Group not found");
+        const { groupId, downloadType, groupType, compositeHashes } = options;
+        let groupName;
+        if (groupType === "custom") {
+          const group = await Group_1.GroupModel.findById(groupId);
+          if (!group) {
+            throw new Error("Group not found");
+          }
+          groupName = group.name;
+        } else {
+          const group = await AutoFolderGroup_1.AutoFolderGroupModel.findById(groupId);
+          if (!group) {
+            throw new Error("Auto-folder group not found");
+          }
+          groupName = group.folder_path;
         }
-        const allImages = await this.getAllImagesWithFiles(groupId);
+        const allImages = await this.getAllImagesWithFiles(groupId, groupType);
         let images = allImages;
         if (compositeHashes && compositeHashes.length > 0) {
           images = allImages.filter((img) => compositeHashes.includes(img.composite_hash));
@@ -70780,23 +71072,35 @@ var require_groupDownloadService = __commonJS({
         if (filesToZip.length === 0) {
           throw new Error(`No ${downloadType} files found in group`);
         }
-        const zipPath = await this.createZipFile(filesToZip, group.name, downloadType);
+        const zipPath = await this.createZipFile(filesToZip, groupName, downloadType);
         return {
           zipPath,
-          fileName: this.generateZipFileName(group.name, downloadType),
+          fileName: this.generateZipFileName(groupName, downloadType),
           fileCount: filesToZip.length
         };
       }
-      static async getAllImagesWithFiles(groupId) {
+      static async getAllImagesWithFiles(groupId, groupType) {
         const images = [];
         let page = 1;
         const limit = 1e3;
         let hasMore = true;
-        while (hasMore) {
-          const result = await Group_1.ImageGroupModel.findImagesByGroupWithFiles(groupId, page, limit);
-          images.push(...result.images);
-          hasMore = result.images.length === limit;
-          page++;
+        if (groupType === "custom") {
+          while (hasMore) {
+            const result = await Group_1.ImageGroupModel.findImagesByGroupWithFiles(groupId, page, limit);
+            images.push(...result.images);
+            hasMore = result.images.length === limit;
+            page++;
+          }
+        } else {
+          while (hasMore) {
+            const pageImages = await AutoFolderGroup_1.AutoFolderGroupImageModel.findPreviewImages(groupId, limit, false);
+            images.push(...pageImages);
+            hasMore = pageImages.length === limit;
+            page++;
+            if (pageImages.length < limit) {
+              hasMore = false;
+            }
+          }
         }
         const uniqueImages = /* @__PURE__ */ new Map();
         for (const img of images) {
@@ -70814,7 +71118,7 @@ var require_groupDownloadService = __commonJS({
           let fileExtension = ".jpg";
           if (downloadType === "thumbnail") {
             if (image.thumbnail_path) {
-              filePath = (0, runtimePaths_12.resolveUploadsPath)(image.thumbnail_path);
+              filePath = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, image.thumbnail_path);
               fileExtension = path_12.default.extname(image.thumbnail_path) || ".jpg";
             }
           } else if (downloadType === "original") {
@@ -70909,14 +71213,14 @@ var require_groupDownloadService = __commonJS({
           console.warn(`Failed to cleanup temp zip file: ${zipPath}`, error);
         }
       }
-      static async getFileCountByType(groupId) {
-        const images = await this.getAllImagesWithFiles(groupId);
+      static async getFileCountByType(groupId, groupType) {
+        const images = await this.getAllImagesWithFiles(groupId, groupType);
         let thumbnailCount = 0;
         let originalCount = 0;
         let videoCount = 0;
         for (const image of images) {
           if (image.thumbnail_path) {
-            const thumbPath = (0, runtimePaths_12.resolveUploadsPath)(image.thumbnail_path);
+            const thumbPath = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, image.thumbnail_path);
             if (fs_12.default.existsSync(thumbPath)) {
               thumbnailCount++;
             }
@@ -70934,7 +71238,7 @@ var require_groupDownloadService = __commonJS({
               }
             }
           } else if (image.thumbnail_path) {
-            const thumbPath = (0, runtimePaths_12.resolveUploadsPath)(image.thumbnail_path);
+            const thumbPath = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, image.thumbnail_path);
             if (fs_12.default.existsSync(thumbPath)) {
               originalCount++;
             }
@@ -71167,7 +71471,8 @@ var require_groups = __commonJS({
     router.delete("/:id", (0, errorHandler_12.asyncHandler)(async (req, res) => {
       try {
         const id = (0, shared_12.validateId)(req.params.id, "Group ID");
-        const deleted = await Group_1.GroupModel.delete(id);
+        const cascade = req.query.cascade === "true";
+        const deleted = await Group_1.GroupModel.delete(id, cascade);
         if (!deleted) {
           return res.status(404).json((0, shared_12.errorResponse)("Group not found"));
         }
@@ -71390,6 +71695,7 @@ var require_groups = __commonJS({
         const result = await groupDownloadService_1.GroupDownloadService.createGroupZip({
           groupId,
           downloadType,
+          groupType: "custom",
           compositeHashes
         });
         const encodedFilename = encodeURIComponent(result.fileName);
@@ -71422,7 +71728,7 @@ var require_groups = __commonJS({
     router.get("/:id/file-counts", (0, errorHandler_12.asyncHandler)(async (req, res) => {
       try {
         const id = (0, shared_12.validateId)(req.params.id, "Group ID");
-        const counts = await groupDownloadService_1.GroupDownloadService.getFileCountByType(id);
+        const counts = await groupDownloadService_1.GroupDownloadService.getFileCountByType(id, "custom");
         return res.json((0, shared_12.successResponse)(counts));
       } catch (error) {
         console.error("Error getting file counts:", error);
@@ -71508,269 +71814,6 @@ var require_groups = __commonJS({
         return res.status(500).json((0, shared_12.errorResponse)("Failed to get groups with hierarchy"));
       }
     }));
-  }
-});
-
-// backend/dist/models/AutoFolderGroup.js
-var require_AutoFolderGroup = __commonJS({
-  "backend/dist/models/AutoFolderGroup.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.AutoFolderGroupImageModel = exports2.AutoFolderGroupModel = void 0;
-    var init_12 = require_init2();
-    var AutoFolderGroupModel = class {
-      static async create(data) {
-        const info = init_12.db.prepare(`
-      INSERT INTO auto_folder_groups (
-        folder_path, absolute_path, display_name, parent_id,
-        depth, has_images, image_count, color
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(data.folder_path, data.absolute_path, data.display_name, data.parent_id ?? null, data.depth, data.has_images ? 1 : 0, data.image_count ?? 0, data.color ?? null);
-        const id = info.lastInsertRowid;
-        const group = await this.findById(id);
-        if (!group) {
-          throw new Error("Failed to create auto folder group");
-        }
-        return group;
-      }
-      static async findById(id) {
-        const row = init_12.db.prepare("SELECT * FROM auto_folder_groups WHERE id = ?").get(id);
-        return row || null;
-      }
-      static async findByFolderPath(folderPath) {
-        const row = init_12.db.prepare("SELECT * FROM auto_folder_groups WHERE folder_path = ?").get(folderPath);
-        return row || null;
-      }
-      static async findRoots() {
-        const query = `
-      SELECT
-        afg.*,
-        (SELECT COUNT(*) FROM auto_folder_groups WHERE parent_id = afg.id) as child_count
-      FROM auto_folder_groups afg
-      WHERE afg.parent_id IS NULL
-      ORDER BY afg.display_name ASC
-    `;
-        const rows = init_12.db.prepare(query).all();
-        return rows || [];
-      }
-      static async findChildren(parentId) {
-        const query = `
-      SELECT
-        afg.*,
-        (SELECT COUNT(*) FROM auto_folder_groups WHERE parent_id = afg.id) as child_count
-      FROM auto_folder_groups afg
-      WHERE afg.parent_id = ?
-      ORDER BY afg.display_name ASC
-    `;
-        const rows = init_12.db.prepare(query).all(parentId);
-        return rows || [];
-      }
-      static async findAllWithStats() {
-        const query = `
-      SELECT
-        afg.*,
-        (SELECT COUNT(*) FROM auto_folder_groups WHERE parent_id = afg.id) as child_count
-      FROM auto_folder_groups afg
-      ORDER BY afg.depth ASC, afg.display_name ASC
-    `;
-        const rows = init_12.db.prepare(query).all();
-        return rows || [];
-      }
-      static async deleteAll() {
-        init_12.db.prepare("DELETE FROM auto_folder_groups").run();
-      }
-      static async delete(id) {
-        const info = init_12.db.prepare("DELETE FROM auto_folder_groups WHERE id = ?").run(id);
-        return info.changes > 0;
-      }
-      static async updateImageCount(id, count) {
-        const info = init_12.db.prepare(`
-      UPDATE auto_folder_groups
-      SET image_count = ?, last_updated = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(count, id);
-        return info.changes > 0;
-      }
-      static async getBreadcrumbPath(groupId) {
-        const path = [];
-        let currentId = groupId;
-        while (currentId !== null) {
-          const group = await this.findById(currentId);
-          if (!group)
-            break;
-          path.unshift({
-            id: group.id,
-            name: group.display_name,
-            folder_path: group.folder_path
-          });
-          currentId = group.parent_id;
-        }
-        return path;
-      }
-    };
-    exports2.AutoFolderGroupModel = AutoFolderGroupModel;
-    var AutoFolderGroupImageModel = class {
-      static async addImageToGroup(groupId, compositeHash) {
-        try {
-          init_12.db.prepare(`
-        INSERT INTO auto_folder_group_images (group_id, composite_hash)
-        VALUES (?, ?)
-      `).run(groupId, compositeHash);
-          return true;
-        } catch (error) {
-          return false;
-        }
-      }
-      static async removeAllImagesFromGroup(groupId) {
-        init_12.db.prepare("DELETE FROM auto_folder_group_images WHERE group_id = ?").run(groupId);
-      }
-      static async findImagesByGroup(groupId, page = 1, pageSize = 50) {
-        const offset = Math.floor((page - 1) * pageSize);
-        try {
-          console.log("[AutoFolderGroup] findImagesByGroup params:", {
-            groupId,
-            groupIdType: typeof groupId,
-            page,
-            pageSize,
-            offset,
-            offsetType: typeof offset
-          });
-          const query = `
-        SELECT m.*,
-        (SELECT id FROM image_files WHERE composite_hash = m.composite_hash AND file_status = 'active' LIMIT 1) as id,
-        (SELECT file_type FROM image_files WHERE composite_hash = m.composite_hash AND file_status = 'active' LIMIT 1) as file_type,
-        (SELECT mime_type FROM image_files WHERE composite_hash = m.composite_hash AND file_status = 'active' LIMIT 1) as mime_type,
-        (SELECT file_size FROM image_files WHERE composite_hash = m.composite_hash AND file_status = 'active' LIMIT 1) as file_size,
-        (SELECT original_file_path FROM image_files WHERE composite_hash = m.composite_hash AND file_status = 'active' LIMIT 1) as original_file_path
-        FROM auto_folder_group_images afgi
-        INNER JOIN media_metadata m ON afgi.composite_hash = m.composite_hash
-        WHERE afgi.group_id = ?
-        ORDER BY m.first_seen_date DESC
-        LIMIT ? OFFSET ?
-      `;
-          const rows = init_12.db.prepare(query).all(groupId, pageSize, offset);
-          console.log("[AutoFolderGroup] findImagesByGroup result:", { rowCount: rows.length });
-          return rows || [];
-        } catch (error) {
-          console.error("[AutoFolderGroup] Error in findImagesByGroup:", {
-            groupId,
-            groupIdType: typeof groupId,
-            page,
-            pageSize,
-            offset,
-            offsetType: typeof offset,
-            error: error instanceof Error ? error.message : error
-          });
-          throw error;
-        }
-      }
-      static async getImageCount(groupId) {
-        const result = init_12.db.prepare(`
-      SELECT COUNT(*) as count
-      FROM auto_folder_group_images
-      WHERE group_id = ?
-    `).get(groupId);
-        return result?.count || 0;
-      }
-      static async findRandomImageForGroup(groupId) {
-        const query = `
-      SELECT m.*
-      FROM auto_folder_group_images afgi
-      INNER JOIN media_metadata m ON afgi.composite_hash = m.composite_hash
-      WHERE afgi.group_id = ?
-      ORDER BY RANDOM()
-      LIMIT 1
-    `;
-        const row = init_12.db.prepare(query).get(groupId);
-        return row || null;
-      }
-      static async findPreviewImages(groupId, count = 8, includeChildren = true) {
-        const query = `
-      SELECT DISTINCT
-        COALESCE(m.composite_hash, afgi.composite_hash) as composite_hash,
-        m.perceptual_hash,
-        m.dhash,
-        m.ahash,
-        m.color_histogram,
-        m.width,
-        m.height,
-        m.thumbnail_path,
-        m.ai_tool,
-        m.model_name,
-        m.lora_models,
-        m.steps,
-        m.cfg_scale,
-        m.sampler,
-        m.seed,
-        m.scheduler,
-        m.prompt,
-        m.negative_prompt,
-        m.denoise_strength,
-        m.generation_time,
-        m.batch_size,
-        m.batch_index,
-        m.auto_tags,
-        m.duration,
-        m.fps,
-        m.video_codec,
-        m.audio_codec,
-        m.bitrate,
-        m.rating_score,
-        m.first_seen_date,
-        m.metadata_updated_date,
-        if.id as file_id,
-        if.original_file_path,
-        if.file_status,
-        if.file_type,
-        if.mime_type,
-        if.folder_id,
-        f.folder_name
-      FROM auto_folder_group_images afgi
-      LEFT JOIN media_metadata m ON afgi.composite_hash = m.composite_hash
-      LEFT JOIN image_files if ON afgi.composite_hash = if.composite_hash
-        AND if.file_status = 'active'
-      LEFT JOIN watched_folders f ON if.folder_id = f.id
-      WHERE afgi.group_id = ?
-      ORDER BY RANDOM()
-      LIMIT ?
-    `;
-        const rows = init_12.db.prepare(query).all(groupId, count);
-        if (rows.length > 0 || !includeChildren) {
-          return rows;
-        }
-        const children = await AutoFolderGroupModel.findChildren(groupId);
-        if (children.length === 0) {
-          return [];
-        }
-        for (const child of children) {
-          const childImages = await this.findPreviewImages(child.id, count, true);
-          if (childImages.length > 0) {
-            return childImages;
-          }
-        }
-        return [];
-      }
-      static async getCompositeHashesForGroup(groupId) {
-        const rows = init_12.db.prepare(`
-      SELECT composite_hash
-      FROM auto_folder_group_images
-      WHERE group_id = ?
-    `).all(groupId);
-        return rows.map((r) => r.composite_hash);
-      }
-      static async findGroupsByImage(compositeHash) {
-        const query = `
-      SELECT afg.*
-      FROM auto_folder_groups afg
-      INNER JOIN auto_folder_group_images afgi ON afg.id = afgi.group_id
-      WHERE afgi.composite_hash = ?
-      ORDER BY afg.folder_path ASC
-    `;
-        const rows = init_12.db.prepare(query).all(compositeHash);
-        return rows || [];
-      }
-    };
-    exports2.AutoFolderGroupImageModel = AutoFolderGroupImageModel;
   }
 });
 
@@ -72214,6 +72257,7 @@ var require_autoFolderGroups = __commonJS({
         const result = await groupDownloadService_1.GroupDownloadService.createGroupZip({
           groupId: id,
           downloadType: type,
+          groupType: "auto-folder",
           compositeHashes: selectedHashes
         });
         res.download(result.zipPath, result.fileName, (err) => {
@@ -72235,7 +72279,7 @@ var require_autoFolderGroups = __commonJS({
     router.get("/:id/file-counts", (0, errorHandler_12.asyncHandler)(async (req, res) => {
       try {
         const id = (0, shared_12.validateId)(req.params.id, "Group ID");
-        const fileCounts = await groupDownloadService_1.GroupDownloadService.getFileCountByType(id);
+        const fileCounts = await groupDownloadService_1.GroupDownloadService.getFileCountByType(id, "auto-folder");
         return res.json((0, shared_12.successResponse)(fileCounts));
       } catch (error) {
         console.error("Error getting file counts:", error);
@@ -91880,6 +91924,36 @@ var require_customDropdownLists = __commonJS({
         const response = {
           success: false,
           error: "Failed to get custom dropdown lists"
+        };
+        return res.status(500).json(response);
+      }
+    }));
+    router.get("/by-name/:name", (0, errorHandler_12.asyncHandler)(async (req, res) => {
+      const name = req.params.name;
+      if (!name) {
+        return res.status(400).json({
+          success: false,
+          error: "List name is required"
+        });
+      }
+      try {
+        const list = await CustomDropdownList_1.CustomDropdownListModel.findByName(name);
+        if (!list) {
+          return res.status(404).json({
+            success: false,
+            error: "List not found"
+          });
+        }
+        const response = {
+          success: true,
+          data: list
+        };
+        return res.json(response);
+      } catch (error) {
+        console.error("Error getting custom dropdown list by name:", error);
+        const response = {
+          success: false,
+          error: "Failed to get custom dropdown list"
         };
         return res.status(500).json(response);
       }
