@@ -2,7 +2,7 @@
 
 AI Image Management and Analysis System for ComfyUI
 
-![Preview](../assets/Preview%20image.jpg)
+![Preview](../docs/assets/Preview image.jpg)
 
 ## Overview
 
