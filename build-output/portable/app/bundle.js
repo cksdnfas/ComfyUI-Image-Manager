@@ -1,5 +1,5 @@
 // ComfyUI Image Manager - Bundled Backend
-// Generated: 2025-11-18T14:56:26.218Z
+// Generated: 2025-11-23T10:48:57.023Z
 // Node.js v22.20.0
 
 "use strict";
@@ -45781,6 +45781,200 @@ var require_networkInfo = __commonJS({
   }
 });
 
+// backend/dist/utils/fileAccess.js
+var require_fileAccess = __commonJS({
+  "backend/dist/utils/fileAccess.js"(exports2) {
+    "use strict";
+    var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
+      return mod && mod.__esModule ? mod : { "default": mod };
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.checkFileAccess = checkFileAccess;
+    exports2.checkDirectoryAccess = checkDirectoryAccess;
+    exports2.assertFileReadable = assertFileReadable;
+    exports2.assertDirectoryWritable = assertDirectoryWritable;
+    var fs_12 = __importDefault2(require("fs"));
+    async function checkFileAccess(filePath) {
+      try {
+        await fs_12.default.promises.access(filePath, fs_12.default.constants.F_OK);
+        const readable = await fs_12.default.promises.access(filePath, fs_12.default.constants.R_OK).then(() => true).catch(() => false);
+        const writable = await fs_12.default.promises.access(filePath, fs_12.default.constants.W_OK).then(() => true).catch(() => false);
+        return {
+          exists: true,
+          readable,
+          writable
+        };
+      } catch (error) {
+        const errno = error.code;
+        return {
+          exists: false,
+          readable: false,
+          writable: false,
+          error: error.message,
+          errorCode: errno
+        };
+      }
+    }
+    async function checkDirectoryAccess(dirPath) {
+      const result = await checkFileAccess(dirPath);
+      if (result.exists) {
+        try {
+          const stats = await fs_12.default.promises.stat(dirPath);
+          if (!stats.isDirectory()) {
+            return {
+              ...result,
+              error: "Path exists but is not a directory",
+              errorCode: "ENOTDIR"
+            };
+          }
+        } catch (error) {
+          return {
+            ...result,
+            error: error.message,
+            errorCode: error.code
+          };
+        }
+      }
+      return result;
+    }
+    async function assertFileReadable(filePath) {
+      const access = await checkFileAccess(filePath);
+      if (!access.exists) {
+        const error = new Error(`File does not exist: ${filePath}`);
+        error.code = "ENOENT";
+        throw error;
+      }
+      if (!access.readable) {
+        const error = new Error(`Permission denied (read): ${filePath}`);
+        error.code = "EACCES";
+        throw error;
+      }
+    }
+    async function assertDirectoryWritable(dirPath) {
+      const access = await checkDirectoryAccess(dirPath);
+      if (!access.exists) {
+        const error = new Error(`Directory does not exist: ${dirPath}`);
+        error.code = "ENOENT";
+        throw error;
+      }
+      if (!access.writable) {
+        const error = new Error(`Permission denied (write): ${dirPath}`);
+        error.code = "EACCES";
+        throw error;
+      }
+    }
+  }
+});
+
+// backend/dist/utils/startupCheck.js
+var require_startupCheck = __commonJS({
+  "backend/dist/utils/startupCheck.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.StartupCheck = void 0;
+    var fileAccess_1 = require_fileAccess();
+    var runtimePaths_12 = require_runtimePaths();
+    var StartupCheck = class {
+      static async runAllChecks() {
+        console.log("\n\u{1F50D} Starting system checks...\n");
+        await this.checkDataDirectoryPermissions();
+        await this.checkDockerEnvironment();
+        console.log("\n\u2705 System checks completed\n");
+      }
+      static async checkDataDirectoryPermissions() {
+        const directories = [
+          { name: "Uploads", path: runtimePaths_12.runtimePaths.uploadsDir },
+          { name: "Database", path: runtimePaths_12.runtimePaths.databaseDir },
+          { name: "Logs", path: runtimePaths_12.runtimePaths.logsDir },
+          { name: "Temp", path: runtimePaths_12.runtimePaths.tempDir },
+          { name: "Models", path: runtimePaths_12.runtimePaths.modelsDir },
+          { name: "RecycleBin", path: runtimePaths_12.runtimePaths.recycleBinDir }
+        ];
+        let hasWarnings = false;
+        for (const dir of directories) {
+          const access = await (0, fileAccess_1.checkDirectoryAccess)(dir.path);
+          if (!access.exists) {
+            console.warn(`\u26A0\uFE0F  ${dir.name} directory does not exist: ${dir.path}`);
+            console.warn(`   This directory will be created automatically.`);
+            hasWarnings = true;
+            continue;
+          }
+          if (!access.readable) {
+            console.error(`\u274C ${dir.name} directory is not readable: ${dir.path}`);
+            console.error(`   Error: ${access.error}`);
+            hasWarnings = true;
+          }
+          if (!access.writable) {
+            console.error(`\u274C ${dir.name} directory is not writable: ${dir.path}`);
+            console.error(`   Error: ${access.error}`);
+            hasWarnings = true;
+          }
+        }
+        if (!hasWarnings) {
+          console.log("\u2713 All data directories are accessible");
+        }
+      }
+      static async checkDockerEnvironment() {
+        const isDocker = this.isRunningInDocker();
+        if (isDocker) {
+          console.log("\u{1F433} Running in Docker environment");
+          const uploadsAccess = await (0, fileAccess_1.checkDirectoryAccess)(runtimePaths_12.runtimePaths.uploadsDir);
+          if (!uploadsAccess.writable) {
+            console.error("\n\u26A0\uFE0F  Docker Volume Permission Issue Detected!\n");
+            console.error("Troubleshooting steps:");
+            console.error("1. Using named volume (recommended):");
+            console.error("   - Docker should manage permissions automatically");
+            console.error("   - Verify volume mount in docker-compose.yml");
+            console.error("");
+            console.error("2. Using bind mount:");
+            console.error("   - Ensure host directory is owned by UID 1001 (appuser)");
+            console.error("   - Run: sudo chown -R 1001:1001 /path/to/host/directory");
+            console.error("");
+            console.error("3. Network drive mount (Windows UNC path):");
+            console.error("   - Check network share permissions");
+            console.error("   - Ensure read/write access is granted");
+            console.error("");
+          } else {
+            console.log("\u2713 Docker volume permissions are correct");
+          }
+          if (process.getuid && process.getgid) {
+            const uid = process.getuid();
+            const gid = process.getgid();
+            console.log(`  Process UID: ${uid}, GID: ${gid}`);
+            if (uid !== 1001) {
+              console.warn(`  \u26A0\uFE0F  Expected UID 1001, but running as ${uid}`);
+            }
+          }
+        } else {
+          console.log("\u{1F4BB} Running in native environment");
+        }
+      }
+      static isRunningInDocker() {
+        if (process.env.DOCKER === "true") {
+          return true;
+        }
+        try {
+          const fs = require("fs");
+          if (fs.existsSync("/.dockerenv")) {
+            return true;
+          }
+        } catch (error) {
+        }
+        try {
+          const fs = require("fs");
+          const cgroup = fs.readFileSync("/proc/1/cgroup", "utf8");
+          if (cgroup.includes("docker") || cgroup.includes("kubepods")) {
+            return true;
+          }
+        } catch (error) {
+        }
+        return false;
+      }
+    };
+    exports2.StartupCheck = StartupCheck;
+  }
+});
+
 // node_modules/busboy/lib/utils.js
 var require_utils3 = __commonJS({
   "node_modules/busboy/lib/utils.js"(exports2, module2) {
@@ -53084,7 +53278,7 @@ var require_settingsService = __commonJS({
             generalThreshold: parseFloat(process.env.TAGGER_GEN_THRESHOLD || "0.35"),
             characterThreshold: parseFloat(process.env.TAGGER_CHAR_THRESHOLD || "0.75"),
             pythonPath: process.env.PYTHON_PATH || "python",
-            keepModelLoaded: false,
+            keepModelLoaded: true,
             autoUnloadMinutes: 5
           },
           similarity: {
@@ -53340,8 +53534,12 @@ var require_settingsService = __commonJS({
 var require_pngExtractor = __commonJS({
   "backend/dist/services/metadata/extractors/pngExtractor.js"(exports2) {
     "use strict";
+    var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
+      return mod && mod.__esModule ? mod : { "default": mod };
+    };
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.PngExtractor = void 0;
+    var zlib_1 = __importDefault2(require("zlib"));
     var PngExtractor = class {
       static extract(buffer) {
         const aiInfo = {};
@@ -53417,7 +53615,7 @@ var require_pngExtractor = __commonJS({
           while (offset < buffer.length - 8) {
             const chunkLength = buffer.readUInt32BE(offset);
             const chunkType = buffer.toString("ascii", offset + 4, offset + 8);
-            if (chunkType === "tEXt" || chunkType === "zTXt") {
+            if (chunkType === "tEXt") {
               const chunkData = buffer.subarray(offset + 8, offset + 8 + chunkLength);
               const rawText = chunkData.toString("utf8");
               rawStrings.push(rawText);
@@ -53426,6 +53624,24 @@ var require_pngExtractor = __commonJS({
                 const key = rawText.substring(0, nullIndex);
                 const value = rawText.substring(nullIndex + 1);
                 textChunks[key] = value;
+              }
+            }
+            if (chunkType === "zTXt") {
+              const chunkData = buffer.subarray(offset + 8, offset + 8 + chunkLength);
+              const nullIndex = chunkData.indexOf(0);
+              if (nullIndex > 0) {
+                const key = chunkData.subarray(0, nullIndex).toString("utf8");
+                const compressedData = chunkData.subarray(nullIndex + 2);
+                try {
+                  const decompressed = zlib_1.default.inflateSync(compressedData);
+                  const value = decompressed.toString("utf8");
+                  textChunks[key] = value;
+                  rawStrings.push(`${key}\0${value}`);
+                } catch (zlibError) {
+                  console.warn(`zTXt decompression failed for key "${key}":`, zlibError);
+                  const rawText = chunkData.toString("utf8");
+                  rawStrings.push(rawText);
+                }
               }
             }
             offset += 8 + chunkLength + 4;
@@ -53457,7 +53673,7 @@ var require_jpegExtractor = __commonJS({
           const image = (0, sharp_1.default)(filePath);
           const metadata = await image.metadata();
           if (metadata.exif) {
-            const exifString = metadata.exif.toString();
+            const exifString = metadata.exif.toString("utf8");
             if (exifString.includes("parameters") && exifString.includes("Steps:")) {
               return { parameters: exifString };
             }
@@ -53632,12 +53848,17 @@ var require_stealthPngExtractor = __commonJS({
           const byteData = this.binaryToBytes(binaryData);
           try {
             let decodedData;
+            let rawBuffer;
             if (compressed) {
               console.log("\u{1F5DC}\uFE0F [StealthPNG] Decompressing gzip data...");
-              const decompressed = zlib_1.default.gunzipSync(Buffer.from(byteData));
-              decodedData = decompressed.toString("utf-8");
+              rawBuffer = zlib_1.default.gunzipSync(Buffer.from(byteData));
             } else {
-              decodedData = Buffer.from(byteData).toString("utf-8");
+              rawBuffer = Buffer.from(byteData);
+            }
+            decodedData = rawBuffer.toString("utf-8");
+            const replacementCount = (decodedData.match(/\uFFFD/g) || []).length;
+            if (replacementCount > 10) {
+              console.warn(`\u26A0\uFE0F [StealthPNG] Possible encoding issue: ${replacementCount} replacement characters found`);
             }
             console.log(`\u2705 [StealthPNG] Successfully decoded ${decodedData.length} characters`);
             return decodedData;
@@ -53862,6 +54083,11 @@ var require_webuiParser = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.WebUIParser = void 0;
     var WebUIParser = class {
+      static sanitizeText(text) {
+        let sanitized = text.replace(/\u0000/g, "");
+        sanitized = sanitized.normalize("NFC");
+        return sanitized;
+      }
       static isWebUIFormat(data) {
         if (typeof data === "string") {
           return data.includes("parameters") || data.includes("Steps:") && data.includes("Sampler:");
@@ -53912,14 +54138,14 @@ var require_webuiParser = __commonJS({
         }
         if (negPromptIndex > 0) {
           const positiveLines = lines.slice(0, negPromptIndex);
-          aiInfo.positive_prompt = positiveLines.join("\n").trim().replace(/\u0000/g, "");
+          aiInfo.positive_prompt = this.sanitizeText(positiveLines.join("\n").trim());
           aiInfo.prompt = aiInfo.positive_prompt;
           const negLine = lines[negPromptIndex];
-          aiInfo.negative_prompt = negLine.substring("Negative prompt:".length).trim().replace(/\u0000/g, "");
+          aiInfo.negative_prompt = this.sanitizeText(negLine.substring("Negative prompt:".length).trim());
           const optionLines = lines.slice(negPromptIndex + 1);
           this.parseOptionLines(optionLines, aiInfo);
         } else {
-          aiInfo.positive_prompt = text.trim().replace(/\u0000/g, "");
+          aiInfo.positive_prompt = this.sanitizeText(text.trim());
           aiInfo.prompt = aiInfo.positive_prompt;
           aiInfo.negative_prompt = "";
         }
@@ -53929,6 +54155,7 @@ var require_webuiParser = __commonJS({
             aiInfo.lora_models = loras;
           }
         }
+        aiInfo.model_references = this.buildModelReferences(aiInfo);
         return aiInfo;
       }
       static parseOptionLines(lines, aiInfo) {
@@ -53942,7 +54169,7 @@ var require_webuiParser = __commonJS({
             continue;
           const colonIndex = trimmedPart.indexOf(":");
           const key = trimmedPart.substring(0, colonIndex).trim();
-          const value = trimmedPart.substring(colonIndex + 1).trim().replace(/\u0000/g, "");
+          const value = this.sanitizeText(trimmedPart.substring(colonIndex + 1).trim());
           this.parseOptionField(key, value, aiInfo);
         }
       }
@@ -54011,6 +54238,62 @@ var require_webuiParser = __commonJS({
           loras.push(match[1]);
         }
         return loras;
+      }
+      static extractLoRAInfoWithWeights(prompt) {
+        const loraRegex = /<lora:([^:]+):([\d.]+)>/g;
+        const loras = [];
+        let match;
+        while ((match = loraRegex.exec(prompt)) !== null) {
+          loras.push({
+            name: match[1],
+            weight: parseFloat(match[2])
+          });
+        }
+        return loras;
+      }
+      static parseLoraHashes(loraHashesStr) {
+        const hashMap = /* @__PURE__ */ new Map();
+        if (!loraHashesStr)
+          return hashMap;
+        const pairs = loraHashesStr.split(",");
+        for (const pair of pairs) {
+          const trimmed = pair.trim();
+          const colonIndex = trimmed.indexOf(":");
+          if (colonIndex > 0) {
+            const name = trimmed.substring(0, colonIndex).trim();
+            const hash = trimmed.substring(colonIndex + 1).trim();
+            if (name && hash) {
+              hashMap.set(name, hash);
+            }
+          }
+        }
+        return hashMap;
+      }
+      static buildModelReferences(aiInfo) {
+        const refs = [];
+        if (aiInfo.model_hash) {
+          refs.push({
+            name: aiInfo.model || "Unknown Model",
+            hash: aiInfo.model_hash,
+            type: "checkpoint"
+          });
+        }
+        const loraHashMap = this.parseLoraHashes(aiInfo.lora_hashes || "");
+        if (aiInfo.positive_prompt) {
+          const lorasWithWeights = this.extractLoRAInfoWithWeights(aiInfo.positive_prompt);
+          for (const lora of lorasWithWeights) {
+            const hash = loraHashMap.get(lora.name);
+            if (hash) {
+              refs.push({
+                name: lora.name,
+                hash,
+                type: "lora",
+                weight: lora.weight
+              });
+            }
+          }
+        }
+        return refs;
       }
     };
     exports2.WebUIParser = WebUIParser;
@@ -54159,6 +54442,17 @@ var require_comfyuiParser = __commonJS({
             aiInfo.lora_models = loras;
           }
         }
+        const loraLoaderLoras = this.extractLoRAFromNodes(workflow);
+        if (loraLoaderLoras.length > 0) {
+          const existingLoras = new Set(aiInfo.lora_models || []);
+          for (const lora of loraLoaderLoras) {
+            if (!existingLoras.has(lora)) {
+              aiInfo.lora_models = aiInfo.lora_models || [];
+              aiInfo.lora_models.push(lora);
+            }
+          }
+        }
+        aiInfo.model_references = this.buildModelReferences(aiInfo, workflow);
         return aiInfo;
       }
       static extractLoRAInfo(prompt) {
@@ -54169,6 +54463,99 @@ var require_comfyuiParser = __commonJS({
           loras.push(match[1]);
         }
         return loras;
+      }
+      static extractLoRAFromNodes(workflow) {
+        const loras = [];
+        for (const nodeId in workflow) {
+          const node = workflow[nodeId];
+          if (!node || typeof node !== "object")
+            continue;
+          const classType = node.class_type;
+          const inputs = node.inputs;
+          if (classType && classType.toLowerCase().includes("lora") && inputs?.lora_name) {
+            const loraName = Array.isArray(inputs.lora_name) ? inputs.lora_name[0] : inputs.lora_name;
+            if (loraName && typeof loraName === "string") {
+              const cleanName = loraName.replace(/\.(safetensors|ckpt|pt)$/i, "");
+              loras.push(cleanName);
+            }
+          }
+        }
+        return loras;
+      }
+      static extractLoRAInfoWithWeights(prompt) {
+        const loraRegex = /<lora:([^:]+):([\d.]+)>/g;
+        const loras = [];
+        let match;
+        while ((match = loraRegex.exec(prompt)) !== null) {
+          loras.push({
+            name: match[1],
+            weight: parseFloat(match[2]) || 1
+          });
+        }
+        return loras;
+      }
+      static buildModelReferences(aiInfo, workflow) {
+        const refs = [];
+        if (aiInfo.model) {
+          const hashMatch = aiInfo.model.match(/\[([a-fA-F0-9]{8,})\]/);
+          const hash = hashMatch ? hashMatch[1] : "";
+          if (hash) {
+            refs.push({
+              name: aiInfo.model.replace(/\[([a-fA-F0-9]{8,})\]/, "").trim(),
+              hash,
+              type: "checkpoint"
+            });
+          }
+        }
+        for (const nodeId in workflow) {
+          const node = workflow[nodeId];
+          if (!node || typeof node !== "object")
+            continue;
+          const classType = node.class_type;
+          const inputs = node.inputs;
+          if (classType === "CheckpointLoaderSimple" && inputs?.ckpt_name) {
+            const ckptName = Array.isArray(inputs.ckpt_name) ? inputs.ckpt_name[0] : inputs.ckpt_name;
+            const hashMatch = ckptName?.match(/\[([a-fA-F0-9]{8,})\]/);
+            if (hashMatch && !refs.some((r) => r.hash === hashMatch[1])) {
+              refs.push({
+                name: ckptName.replace(/\[([a-fA-F0-9]{8,})\]/, "").replace(/\.(safetensors|ckpt)$/i, "").trim(),
+                hash: hashMatch[1],
+                type: "checkpoint"
+              });
+            }
+          }
+          if (classType && classType.toLowerCase().includes("lora") && inputs?.lora_name) {
+            const loraName = Array.isArray(inputs.lora_name) ? inputs.lora_name[0] : inputs.lora_name;
+            const hashMatch = loraName?.match(/\[([a-fA-F0-9]{8,})\]/);
+            if (hashMatch) {
+              const cleanName = loraName.replace(/\[([a-fA-F0-9]{8,})\]/, "").replace(/\.(safetensors|ckpt|pt)$/i, "").trim();
+              const strength = inputs.strength_model || inputs.strength || 1;
+              if (!refs.some((r) => r.hash === hashMatch[1])) {
+                refs.push({
+                  name: cleanName,
+                  hash: hashMatch[1],
+                  type: "lora",
+                  weight: typeof strength === "number" ? strength : 1
+                });
+              }
+            }
+          }
+        }
+        if (aiInfo.positive_prompt) {
+          const lorasWithWeights = this.extractLoRAInfoWithWeights(aiInfo.positive_prompt);
+          for (const lora of lorasWithWeights) {
+            const hashMatch = lora.name.match(/\[([a-fA-F0-9]{8,})\]/);
+            if (hashMatch && !refs.some((r) => r.hash === hashMatch[1])) {
+              refs.push({
+                name: lora.name.replace(/\[([a-fA-F0-9]{8,})\]/, "").trim(),
+                hash: hashMatch[1],
+                type: "lora",
+                weight: lora.weight
+              });
+            }
+          }
+        }
+        return refs;
       }
     };
     exports2.ComfyUIParser = ComfyUIParser;
@@ -54257,6 +54644,85 @@ var require_workflowDetector = __commonJS({
   }
 });
 
+// backend/dist/types/errors.js
+var require_errors = __commonJS({
+  "backend/dist/types/errors.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.BackgroundProcessingError = exports2.MetadataExtractionError = exports2.MetadataExtractionErrorType = void 0;
+    var MetadataExtractionErrorType;
+    (function(MetadataExtractionErrorType2) {
+      MetadataExtractionErrorType2["FILE_ACCESS_ERROR"] = "file_access_error";
+      MetadataExtractionErrorType2["PERMISSION_ERROR"] = "permission_error";
+      MetadataExtractionErrorType2["CORRUPT_FILE"] = "corrupt_file";
+      MetadataExtractionErrorType2["NO_METADATA"] = "no_metadata";
+      MetadataExtractionErrorType2["PARSING_ERROR"] = "parsing_error";
+      MetadataExtractionErrorType2["UNKNOWN_ERROR"] = "unknown_error";
+    })(MetadataExtractionErrorType || (exports2.MetadataExtractionErrorType = MetadataExtractionErrorType = {}));
+    var MetadataExtractionError = class _MetadataExtractionError extends Error {
+      constructor(message, type, retryable, filePath, originalError) {
+        super(message);
+        this.type = type;
+        this.retryable = retryable;
+        this.filePath = filePath;
+        this.originalError = originalError;
+        this.name = "MetadataExtractionError";
+        if (originalError && originalError.stack) {
+          this.stack = `${this.stack}
+Caused by: ${originalError.stack}`;
+        }
+      }
+      static fileAccessError(filePath, originalError) {
+        return new _MetadataExtractionError(`Cannot access file: ${filePath}`, MetadataExtractionErrorType.FILE_ACCESS_ERROR, true, filePath, originalError);
+      }
+      static permissionError(filePath, originalError) {
+        return new _MetadataExtractionError(`Permission denied: ${filePath}`, MetadataExtractionErrorType.PERMISSION_ERROR, true, filePath, originalError);
+      }
+      static corruptFileError(filePath, originalError) {
+        return new _MetadataExtractionError(`File is corrupt or invalid: ${filePath}`, MetadataExtractionErrorType.CORRUPT_FILE, false, filePath, originalError);
+      }
+      static noMetadata(filePath) {
+        return new _MetadataExtractionError(`No metadata found in file: ${filePath}`, MetadataExtractionErrorType.NO_METADATA, false, filePath);
+      }
+      static parsingError(filePath, originalError) {
+        return new _MetadataExtractionError(`Failed to parse metadata: ${filePath}`, MetadataExtractionErrorType.PARSING_ERROR, false, filePath, originalError);
+      }
+      static unknownError(filePath, originalError) {
+        return new _MetadataExtractionError(`Unknown error while extracting metadata: ${filePath}`, MetadataExtractionErrorType.UNKNOWN_ERROR, true, filePath, originalError);
+      }
+      static fromNodeError(filePath, error) {
+        const code = error.code;
+        switch (code) {
+          case "ENOENT":
+            return _MetadataExtractionError.fileAccessError(filePath, error);
+          case "EACCES":
+          case "EPERM":
+            return _MetadataExtractionError.permissionError(filePath, error);
+          case "EISDIR":
+          case "ENOTDIR":
+            return _MetadataExtractionError.fileAccessError(filePath, error);
+          default:
+            return _MetadataExtractionError.unknownError(filePath, error);
+        }
+      }
+    };
+    exports2.MetadataExtractionError = MetadataExtractionError;
+    var BackgroundProcessingError = class extends Error {
+      constructor(message, retryable, originalError) {
+        super(message);
+        this.retryable = retryable;
+        this.originalError = originalError;
+        this.name = "BackgroundProcessingError";
+        if (originalError && originalError.stack) {
+          this.stack = `${this.stack}
+Caused by: ${originalError.stack}`;
+        }
+      }
+    };
+    exports2.BackgroundProcessingError = BackgroundProcessingError;
+  }
+});
+
 // backend/dist/services/metadata/types.js
 var require_types2 = __commonJS({
   "backend/dist/services/metadata/types.js"(exports2) {
@@ -54323,18 +54789,27 @@ var require_metadata = __commonJS({
     var webuiParser_1 = require_webuiParser();
     var comfyuiParser_1 = require_comfyuiParser();
     var workflowDetector_1 = require_workflowDetector();
+    var errors_1 = require_errors();
+    var fileAccess_1 = require_fileAccess();
     var MetadataExtractor = class {
       static async extractMetadata(filePath) {
         const startTime = Date.now();
         const fileName = path_12.default.basename(filePath);
         console.log(`\u23F1\uFE0F [MetadataExtractor] Starting extraction: ${fileName}`);
         try {
-          if (!fs_12.default.existsSync(filePath)) {
-            throw new Error(`File does not exist: ${filePath}`);
+          try {
+            await (0, fileAccess_1.assertFileReadable)(filePath);
+          } catch (error) {
+            throw errors_1.MetadataExtractionError.fromNodeError(filePath, error);
           }
           const fileExt = path_12.default.extname(filePath).toLowerCase();
           const readStart = Date.now();
-          const buffer = await fs_12.default.promises.readFile(filePath);
+          let buffer;
+          try {
+            buffer = await fs_12.default.promises.readFile(filePath);
+          } catch (error) {
+            throw errors_1.MetadataExtractionError.fromNodeError(filePath, error);
+          }
           console.log(`\u23F1\uFE0F [MetadataExtractor] File read (${(buffer.length / 1024).toFixed(1)}KB): ${Date.now() - readStart}ms`);
           const primaryStart = Date.now();
           let aiInfo = await this.primaryExtraction(buffer, filePath, fileExt);
@@ -54415,12 +54890,16 @@ var require_metadata = __commonJS({
           };
         } catch (error) {
           console.error(`\u23F1\uFE0F [MetadataExtractor] \u274C Failed after ${Date.now() - startTime}ms:`, error);
+          if (error instanceof errors_1.MetadataExtractionError) {
+            throw error;
+          }
+          const parsingError = errors_1.MetadataExtractionError.parsingError(filePath, error);
           return {
             extractedAt: (/* @__PURE__ */ new Date()).toISOString(),
             ai_info: {
               ai_tool: "Unknown"
             },
-            error: "Failed to extract metadata"
+            error: parsingError.message
           };
         }
       }
@@ -55122,9 +55601,9 @@ var require_MediaMetadataModel = __commonJS({
         width, height, thumbnail_path,
         ai_tool, model_name, lora_models, steps, cfg_scale, sampler, seed, scheduler,
         prompt, negative_prompt, denoise_strength, generation_time, batch_size, batch_index,
-        auto_tags, duration, fps, video_codec, audio_codec, bitrate, rating_score
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(data.composite_hash, data.perceptual_hash, data.dhash, data.ahash, data.color_histogram, data.width, data.height, data.thumbnail_path, data.ai_tool, data.model_name, data.lora_models, data.steps, data.cfg_scale, data.sampler, data.seed, data.scheduler, data.prompt, data.negative_prompt, data.denoise_strength, data.generation_time, data.batch_size, data.batch_index, data.auto_tags, data.duration, data.fps, data.video_codec, data.audio_codec, data.bitrate, data.rating_score);
+        auto_tags, duration, fps, video_codec, audio_codec, bitrate, rating_score, model_references
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(data.composite_hash, data.perceptual_hash, data.dhash, data.ahash, data.color_histogram, data.width, data.height, data.thumbnail_path, data.ai_tool, data.model_name, data.lora_models, data.steps, data.cfg_scale, data.sampler, data.seed, data.scheduler, data.prompt, data.negative_prompt, data.denoise_strength, data.generation_time, data.batch_size, data.batch_index, data.auto_tags, data.duration, data.fps, data.video_codec, data.audio_codec, data.bitrate, data.rating_score, data.model_references);
         return data.composite_hash;
       }
       static update(compositeHash, updates) {
@@ -55147,7 +55626,8 @@ var require_MediaMetadataModel = __commonJS({
           "batch_index",
           "thumbnail_path",
           "width",
-          "height"
+          "height",
+          "model_references"
         ];
         const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([key]) => updatableFields.includes(key)));
         const filteredUpdates = (0, dynamicUpdate_1.filterDefined)(cleanUpdates);
@@ -55466,7 +55946,18 @@ var require_MediaMetadataModel = __commonJS({
         return { items, total: countRow.total };
       }
       static getRandomImage() {
-        const row = init_12.db.prepare(`
+        const countStmt = init_12.db.prepare(`
+      SELECT COUNT(*) as total
+      FROM image_files if
+      WHERE if.file_status = 'active' AND if.composite_hash IS NOT NULL
+    `);
+        const countRow = countStmt.get();
+        if (!countRow || countRow.total === 0) {
+          return null;
+        }
+        const randomOffset = Math.floor(Math.random() * countRow.total);
+        console.log("[MediaMetadataModel] Random offset:", randomOffset, "out of", countRow.total);
+        const stmt = init_12.db.prepare(`
       SELECT
         mm.composite_hash,
         mm.perceptual_hash,
@@ -55508,9 +55999,10 @@ var require_MediaMetadataModel = __commonJS({
       FROM image_files if
       LEFT JOIN media_metadata mm ON if.composite_hash = mm.composite_hash
       WHERE if.file_status = 'active' AND if.composite_hash IS NOT NULL
-      ORDER BY RANDOM()
-      LIMIT 1
-    `).get();
+      LIMIT 1 OFFSET ?
+    `);
+        const row = stmt.get(randomOffset);
+        console.log("[MediaMetadataModel] Random image selected:", row?.composite_hash?.substring(0, 8));
         return row || null;
       }
     };
@@ -56755,6 +57247,19 @@ var require_ImageSearchModel = __commonJS({
           }
         }
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+        const countQuery = `
+      SELECT COUNT(*) as total
+      FROM media_metadata im
+      LEFT JOIN image_files if ON im.composite_hash = if.composite_hash AND if.file_status = 'active'
+      ${groupJoinClause}
+      ${whereClause}
+    `;
+        const countRow = init_12.db.prepare(countQuery).get(...params);
+        if (!countRow || countRow.total === 0) {
+          return null;
+        }
+        const randomOffset = Math.floor(Math.random() * countRow.total);
+        console.log("[ImageSearchModel] Random offset:", randomOffset, "out of", countRow.total);
         const query = `
       SELECT
         im.*,
@@ -56763,15 +57268,16 @@ var require_ImageSearchModel = __commonJS({
         if.file_status,
         if.file_size,
         if.mime_type,
-        if.folder_id
+        if.folder_id,
+        if.file_type
       FROM media_metadata im
       LEFT JOIN image_files if ON im.composite_hash = if.composite_hash AND if.file_status = 'active'
       ${groupJoinClause}
       ${whereClause}
-      ORDER BY RANDOM()
-      LIMIT 1
+      LIMIT 1 OFFSET ?
     `;
-        const row = init_12.db.prepare(query).get(...params);
+        const row = init_12.db.prepare(query).get(...params, randomOffset);
+        console.log("[ImageSearchModel] Random image selected:", row?.composite_hash?.substring(0, 8));
         return row || null;
       }
     };
@@ -59426,7 +59932,8 @@ var require_deletionService = __commonJS({
         }
         const metadata = MediaMetadataModel_1.MediaMetadataModel.findByHash(compositeHash);
         if (!metadata) {
-          throw new Error("Image not found");
+          console.warn(`\u26A0\uFE0F Image already deleted or not found: ${compositeHash}`);
+          return true;
         }
         const files = ImageFileModel_1.ImageFileModel.findActiveByHash(compositeHash);
         if (files.length === 0) {
@@ -59486,6 +59993,56 @@ var require_deletionService = __commonJS({
           console.log(`\u2705 Image ${compositeHash} deleted successfully`);
           return true;
         }
+      }
+      static async deleteImageFile(fileId) {
+        console.log(`\u{1F50D} Starting deleteImageFile for file_id: ${fileId}`);
+        const file = ImageFileModel_1.ImageFileModel.findById(fileId);
+        if (!file) {
+          console.warn(`\u26A0\uFE0F File not found: ${fileId}`);
+          return false;
+        }
+        const { composite_hash, original_file_path } = file;
+        console.log(`\u{1F4C1} File info: ${original_file_path}`);
+        const settings = settingsService_12.settingsService.loadSettings();
+        const useRecycleBin = settings.general.deleteProtection.enabled;
+        const recycleBinPath = settings.general.deleteProtection.recycleBinPath || runtimePaths_12.runtimePaths.recycleBinDir;
+        console.log(`\u{1F5D1}\uFE0F Deleting file_id ${fileId}: {
+  path: ${original_file_path},
+  composite_hash: ${composite_hash},
+  useRecycleBin: ${useRecycleBin},
+  recycleBinPath: ${recycleBinPath}
+}`);
+        try {
+          await this.deletePhysicalFile(original_file_path, useRecycleBin);
+          console.log(`\u2705 Physical file deleted: ${original_file_path}`);
+        } catch (error) {
+          console.error(`\u274C Failed to delete physical file: ${original_file_path}`, error);
+        }
+        init_12.db.prepare("DELETE FROM image_files WHERE id = ?").run(fileId);
+        console.log(`\u2705 Deleted image_file record: ${fileId}`);
+        if (composite_hash) {
+          const remainingFiles = ImageFileModel_1.ImageFileModel.findActiveByHash(composite_hash);
+          if (remainingFiles.length === 0) {
+            console.log(`\u26A0\uFE0F Last file deleted - cleaning up metadata for ${composite_hash}`);
+            const metadata = MediaMetadataModel_1.MediaMetadataModel.findByHash(composite_hash);
+            if (metadata) {
+              await this.cleanupPromptCollection(metadata.prompt, metadata.negative_prompt);
+              if (metadata.thumbnail_path) {
+                try {
+                  await this.deletePhysicalFile(metadata.thumbnail_path, useRecycleBin);
+                } catch (error) {
+                  console.warn(`\u26A0\uFE0F Failed to delete thumbnail (non-critical)`);
+                }
+              }
+              MediaMetadataModel_1.MediaMetadataModel.delete(composite_hash);
+              console.log(`\u2705 Metadata cleaned up for ${composite_hash}`);
+            }
+          } else {
+            console.log(`\u{1F4CB} ${remainingFiles.length} file(s) remaining with same hash - keeping metadata`);
+          }
+        }
+        console.log(`\u2705 File ${fileId} deleted successfully`);
+        return true;
       }
       static async deleteGenerationHistoryOnly(historyId) {
         const history = GenerationHistory_1.GenerationHistoryModel.findById(historyId);
@@ -61406,7 +61963,15 @@ var require_query_routes = __commonJS({
           sortBy,
           sortOrder
         });
+        console.log("\u{1F50D} [QueryRoutes] Query result - first 3 records:");
+        result.items.slice(0, 3).forEach((item, idx) => {
+          console.log(`  [${idx}] file_id=${item.id}, hash=${item.composite_hash?.substring(0, 8)}, path=${item.original_file_path}`);
+        });
         const enrichedImages = result.items.map(utils_1.enrichImageWithFileView);
+        console.log("\u{1F50D} [QueryRoutes] Enriched result - first 3 records:");
+        enrichedImages.slice(0, 3).forEach((item, idx) => {
+          console.log(`  [${idx}] file_id=${item.id}, hash=${item.composite_hash?.substring(0, 8)}, path=${item.original_file_path}`);
+        });
         if (enrichedImages.length > 0) {
           console.log("[QueryRoutes] Sample image rating_score:", {
             composite_hash: enrichedImages[0].composite_hash,
@@ -63477,6 +64042,39 @@ var require_management_routes = __commonJS({
       QueryCacheService_12.QueryCacheService.invalidateImageCache(compositeHash, true);
       console.log("\u{1F5D1}\uFE0F All caches invalidated for deleted image");
       res.json((0, shared_12.successResponse)({ message: "Image deleted successfully" }));
+    }));
+    router.delete("/files/bulk", (0, errorHandler_12.asyncHandler)(async (req, res) => {
+      const { fileIds } = req.body;
+      if (!Array.isArray(fileIds) || fileIds.length === 0) {
+        return res.status(400).json((0, shared_12.errorResponse)("fileIds array is required"));
+      }
+      console.log(`\u{1F5D1}\uFE0F Bulk file deletion requested: ${fileIds.length} files`);
+      const results = {
+        deleted: 0,
+        failed: 0,
+        errors: []
+      };
+      for (const fileId of fileIds) {
+        try {
+          const success = await deletionService_1.DeletionService.deleteImageFile(fileId);
+          if (success) {
+            results.deleted++;
+          } else {
+            results.failed++;
+            results.errors.push(`File ${fileId} not found`);
+          }
+        } catch (error) {
+          results.failed++;
+          results.errors.push(`File ${fileId}: ${error instanceof Error ? error.message : "Unknown error"}`);
+          console.error(`\u274C Failed to delete file ${fileId}:`, error);
+        }
+      }
+      QueryCacheService_12.QueryCacheService.invalidateImageCache(void 0, true);
+      console.log("\u{1F5D1}\uFE0F All caches invalidated after bulk deletion");
+      return res.json((0, shared_12.successResponse)({
+        message: `Deleted ${results.deleted} file(s)`,
+        details: results
+      }));
     }));
   }
 });
@@ -66114,6 +66712,1004 @@ var require_autoCollectionService = __commonJS({
   }
 });
 
+// backend/dist/database/userSettingsDb.js
+var require_userSettingsDb = __commonJS({
+  "backend/dist/database/userSettingsDb.js"(exports2) {
+    "use strict";
+    var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
+      return mod && mod.__esModule ? mod : { "default": mod };
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.userSettingsDb = void 0;
+    exports2.initializeUserSettingsDb = initializeUserSettingsDb;
+    exports2.closeUserSettingsDb = closeUserSettingsDb;
+    exports2.getUserSettingsDb = getUserSettingsDb;
+    var better_sqlite3_1 = __importDefault2(require("better-sqlite3"));
+    var path_12 = __importDefault2(require("path"));
+    var fs_12 = __importDefault2(require("fs"));
+    var runtimePaths_12 = require_runtimePaths();
+    var USER_SETTINGS_DB_PATH = path_12.default.join(runtimePaths_12.runtimePaths.databaseDir, "user-settings.db");
+    var getMigrationsPath = () => {
+      const possiblePaths = [
+        path_12.default.join(__dirname, "../../src/database/migrations/user-settings"),
+        path_12.default.join(__dirname, "migrations/user-settings"),
+        path_12.default.join(process.cwd(), "app", "migrations", "user-settings"),
+        path_12.default.join(path_12.default.dirname(process.argv[1] || ""), "migrations", "user-settings"),
+        path_12.default.join(__dirname, "../migrations/user-settings")
+      ];
+      for (const p of possiblePaths) {
+        if (fs_12.default.existsSync(p)) {
+          return p;
+        }
+      }
+      return possiblePaths[0];
+    };
+    var MIGRATIONS_PATH = getMigrationsPath();
+    function initializeUserSettingsDb() {
+      try {
+        const dbDir = path_12.default.dirname(USER_SETTINGS_DB_PATH);
+        if (!fs_12.default.existsSync(dbDir)) {
+          fs_12.default.mkdirSync(dbDir, { recursive: true });
+        }
+        const isNewDatabase = !fs_12.default.existsSync(USER_SETTINGS_DB_PATH);
+        exports2.userSettingsDb = new better_sqlite3_1.default(USER_SETTINGS_DB_PATH);
+        if (isNewDatabase) {
+          console.log("\u2705 New user settings database created");
+        } else {
+          console.log("\u2705 Connected to existing user settings database");
+        }
+        runMigrations();
+      } catch (error) {
+        console.error("Failed to initialize user settings database:", error);
+        throw error;
+      }
+    }
+    function createMigrationsTable() {
+      exports2.userSettingsDb.exec(`
+    CREATE TABLE IF NOT EXISTS user_settings_migrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      version VARCHAR(255) NOT NULL UNIQUE,
+      applied_date DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+    }
+    function getAppliedMigrations() {
+      const rows = exports2.userSettingsDb.prepare("SELECT version FROM user_settings_migrations ORDER BY version").all();
+      return rows.map((row) => row.version);
+    }
+    function recordMigration(version2) {
+      exports2.userSettingsDb.prepare("INSERT INTO user_settings_migrations (version) VALUES (?)").run(version2);
+    }
+    function createTables() {
+      console.log("\u{1F4CA} Creating user settings tables...");
+      exports2.userSettingsDb.exec(`
+    CREATE TABLE IF NOT EXISTS workflows (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name VARCHAR(255) NOT NULL UNIQUE,
+      description TEXT,
+      workflow_json TEXT NOT NULL,
+      marked_fields TEXT,
+      api_endpoint VARCHAR(500) DEFAULT 'http://127.0.0.1:8188',
+      is_active BOOLEAN DEFAULT 1,
+      color VARCHAR(10) DEFAULT '#2196f3',
+      created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_date DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+      exports2.userSettingsDb.exec(`
+    CREATE TABLE IF NOT EXISTS comfyui_servers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name VARCHAR(255) NOT NULL UNIQUE,
+      endpoint VARCHAR(500) NOT NULL,
+      description TEXT,
+      is_active BOOLEAN DEFAULT 1,
+      created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_date DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+      exports2.userSettingsDb.exec(`
+    CREATE TABLE IF NOT EXISTS workflow_servers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      workflow_id INTEGER NOT NULL,
+      server_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE,
+      FOREIGN KEY (server_id) REFERENCES comfyui_servers(id) ON DELETE CASCADE,
+      UNIQUE(workflow_id, server_id)
+    )
+  `);
+      exports2.userSettingsDb.exec(`
+    CREATE TABLE IF NOT EXISTS user_preferences (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT NOT NULL UNIQUE,
+      value TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+      exports2.userSettingsDb.exec(`
+    CREATE TABLE IF NOT EXISTS wildcards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT,
+      is_auto_collected INTEGER DEFAULT 0,
+      source_path TEXT,
+      lora_weight REAL DEFAULT 1.0,
+      created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_date DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+      exports2.userSettingsDb.exec(`
+    CREATE TABLE IF NOT EXISTS wildcard_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      wildcard_id INTEGER NOT NULL,
+      tool TEXT NOT NULL CHECK(tool IN ('comfyui', 'nai')),
+      content TEXT NOT NULL,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (wildcard_id) REFERENCES wildcards(id) ON DELETE CASCADE
+    )
+  `);
+      exports2.userSettingsDb.exec(`
+    CREATE TABLE IF NOT EXISTS custom_dropdown_lists (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name VARCHAR(255) NOT NULL UNIQUE,
+      description TEXT,
+      items TEXT NOT NULL,
+      is_auto_collected INTEGER DEFAULT 0,
+      source_path TEXT,
+      created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_date DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+      exports2.userSettingsDb.exec(`
+    CREATE TABLE IF NOT EXISTS external_api_providers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider_name TEXT NOT NULL UNIQUE,
+      display_name TEXT NOT NULL,
+      api_key TEXT,
+      api_secret TEXT,
+      base_url TEXT,
+      additional_config TEXT,
+      is_enabled INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+      const hasColumn = (tableName, columnName) => {
+        const pragma = exports2.userSettingsDb.prepare(`PRAGMA table_info(${tableName})`).all();
+        return pragma.some((col) => col.name === columnName);
+      };
+      if (!hasColumn("wildcards", "is_auto_collected")) {
+        console.log("  Migrating wildcards: adding is_auto_collected column");
+        exports2.userSettingsDb.exec("ALTER TABLE wildcards ADD COLUMN is_auto_collected INTEGER DEFAULT 0");
+      }
+      if (!hasColumn("wildcards", "source_path")) {
+        console.log("  Migrating wildcards: adding source_path column");
+        exports2.userSettingsDb.exec("ALTER TABLE wildcards ADD COLUMN source_path TEXT");
+      }
+      if (!hasColumn("wildcards", "lora_weight")) {
+        console.log("  Migrating wildcards: adding lora_weight column");
+        exports2.userSettingsDb.exec("ALTER TABLE wildcards ADD COLUMN lora_weight REAL DEFAULT 1.0");
+      }
+      if (!hasColumn("wildcards", "parent_id")) {
+        console.log("  Migrating wildcards: adding parent_id column");
+        exports2.userSettingsDb.exec("ALTER TABLE wildcards ADD COLUMN parent_id INTEGER DEFAULT NULL");
+      }
+      if (!hasColumn("wildcards", "include_children")) {
+        console.log("  Migrating wildcards: adding include_children column");
+        exports2.userSettingsDb.exec("ALTER TABLE wildcards ADD COLUMN include_children INTEGER DEFAULT 0");
+      }
+      if (!hasColumn("custom_dropdown_lists", "is_auto_collected")) {
+        console.log("  Migrating custom_dropdown_lists: adding is_auto_collected column");
+        exports2.userSettingsDb.exec("ALTER TABLE custom_dropdown_lists ADD COLUMN is_auto_collected INTEGER DEFAULT 0");
+      }
+      if (!hasColumn("custom_dropdown_lists", "source_path")) {
+        console.log("  Migrating custom_dropdown_lists: adding source_path column");
+        exports2.userSettingsDb.exec("ALTER TABLE custom_dropdown_lists ADD COLUMN source_path TEXT");
+      }
+      const indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_workflows_name ON workflows(name)",
+        "CREATE INDEX IF NOT EXISTS idx_workflows_is_active ON workflows(is_active)",
+        "CREATE INDEX IF NOT EXISTS idx_workflows_created_date ON workflows(created_date)",
+        "CREATE INDEX IF NOT EXISTS idx_comfyui_servers_name ON comfyui_servers(name)",
+        "CREATE INDEX IF NOT EXISTS idx_comfyui_servers_active ON comfyui_servers(is_active)",
+        "CREATE INDEX IF NOT EXISTS idx_workflow_servers_workflow ON workflow_servers(workflow_id)",
+        "CREATE INDEX IF NOT EXISTS idx_workflow_servers_server ON workflow_servers(server_id)",
+        "CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(key)",
+        "CREATE INDEX IF NOT EXISTS idx_wildcards_name ON wildcards(name)",
+        "CREATE INDEX IF NOT EXISTS idx_wildcards_is_auto_collected ON wildcards(is_auto_collected)",
+        "CREATE INDEX IF NOT EXISTS idx_wildcards_parent_id ON wildcards(parent_id)",
+        "CREATE INDEX IF NOT EXISTS idx_wildcard_items_wildcard_id ON wildcard_items(wildcard_id)",
+        "CREATE INDEX IF NOT EXISTS idx_wildcard_items_tool ON wildcard_items(tool)",
+        "CREATE INDEX IF NOT EXISTS idx_custom_dropdown_lists_name ON custom_dropdown_lists(name)",
+        "CREATE INDEX IF NOT EXISTS idx_custom_dropdown_lists_created_date ON custom_dropdown_lists(created_date)",
+        "CREATE INDEX IF NOT EXISTS idx_custom_dropdown_lists_is_auto_collected ON custom_dropdown_lists(is_auto_collected)",
+        "CREATE INDEX IF NOT EXISTS idx_external_api_providers_name ON external_api_providers(provider_name)",
+        "CREATE INDEX IF NOT EXISTS idx_external_api_providers_is_enabled ON external_api_providers(is_enabled)"
+      ];
+      indexes.forEach((sql) => exports2.userSettingsDb.exec(sql));
+      exports2.userSettingsDb.prepare(`INSERT OR IGNORE INTO user_preferences (key, value) VALUES (?, ?)`).run("language", "en");
+      exports2.userSettingsDb.prepare(`
+    INSERT OR IGNORE INTO external_api_providers (provider_name, display_name, is_enabled)
+    VALUES (?, ?, ?)
+  `).run("civitai", "Civitai", 1);
+      console.log("  \u2705 User settings tables created (8 tables + indexes)");
+      migrateExistingTables();
+    }
+    function migrateExistingTables() {
+      console.log("\u{1F504} Checking for complex schema migrations...");
+      try {
+        const hasColumn = (tableName, columnName) => {
+          const pragma = exports2.userSettingsDb.prepare(`PRAGMA table_info(${tableName})`).all();
+          return pragma.some((col) => col.name === columnName);
+        };
+        if (hasColumn("wildcard_items", "item_text")) {
+          console.log("  Migrating wildcard_items table to new schema...");
+          exports2.userSettingsDb.exec(`
+        CREATE TABLE IF NOT EXISTS wildcard_items_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          wildcard_id INTEGER NOT NULL,
+          tool TEXT NOT NULL CHECK(tool IN ('comfyui', 'nai')) DEFAULT 'comfyui',
+          content TEXT NOT NULL,
+          order_index INTEGER NOT NULL DEFAULT 0,
+          created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (wildcard_id) REFERENCES wildcards(id) ON DELETE CASCADE
+        )
+      `);
+          exports2.userSettingsDb.exec(`
+        INSERT INTO wildcard_items_new (id, wildcard_id, tool, content, order_index, created_date)
+        SELECT id, wildcard_id, 'comfyui', item_text, 0, created_at
+        FROM wildcard_items
+      `);
+          exports2.userSettingsDb.exec("DROP TABLE wildcard_items");
+          exports2.userSettingsDb.exec("ALTER TABLE wildcard_items_new RENAME TO wildcard_items");
+          exports2.userSettingsDb.exec("CREATE INDEX IF NOT EXISTS idx_wildcard_items_wildcard_id ON wildcard_items(wildcard_id)");
+          exports2.userSettingsDb.exec("CREATE INDEX IF NOT EXISTS idx_wildcard_items_tool ON wildcard_items(tool)");
+          console.log("  \u2705 wildcard_items table migrated successfully");
+        } else {
+          console.log("  \u2713 No complex migrations needed");
+        }
+        console.log("  \u2705 Schema migration complete");
+      } catch (error) {
+        console.error("  \u26A0\uFE0F Error during schema migration:", error);
+      }
+    }
+    function runMigrations() {
+      createMigrationsTable();
+      if (!fs_12.default.existsSync(MIGRATIONS_PATH)) {
+        console.log("\u{1F4CA} No migrations folder found, creating tables directly...");
+        createTables();
+        return;
+      }
+      console.log(`\u{1F4C2} Using user settings migrations from: ${MIGRATIONS_PATH}`);
+      const appliedMigrations = getAppliedMigrations();
+      const files = fs_12.default.readdirSync(MIGRATIONS_PATH).filter((file) => file.endsWith(".sql")).sort();
+      const pendingMigrations = files.filter((file) => !appliedMigrations.includes(file));
+      if (pendingMigrations.length === 0) {
+        console.log("  \u2713 All migrations already applied");
+        return;
+      }
+      for (const file of pendingMigrations) {
+        const filePath = path_12.default.join(MIGRATIONS_PATH, file);
+        const sql = fs_12.default.readFileSync(filePath, "utf8");
+        try {
+          exports2.userSettingsDb.exec(sql);
+          recordMigration(file);
+          console.log(`  \u2713 Migration applied: ${file}`);
+        } catch (error) {
+          console.error(`  \u2717 Migration failed: ${file}`, error);
+          throw error;
+        }
+      }
+    }
+    function closeUserSettingsDb() {
+      if (exports2.userSettingsDb) {
+        exports2.userSettingsDb.close();
+        console.log("User Settings database connection closed");
+      }
+    }
+    function getUserSettingsDb() {
+      if (!exports2.userSettingsDb) {
+        throw new Error("User Settings database not initialized");
+      }
+      return exports2.userSettingsDb;
+    }
+  }
+});
+
+// backend/dist/services/externalApiService.js
+var require_externalApiService = __commonJS({
+  "backend/dist/services/externalApiService.js"(exports2) {
+    "use strict";
+    var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
+      return mod && mod.__esModule ? mod : { "default": mod };
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.ExternalApiService = void 0;
+    var crypto_12 = __importDefault2(require("crypto"));
+    var ExternalApiService = class {
+      static getEncryptionKey() {
+        const secret = process.env.API_KEY_ENCRYPTION_SECRET || "comfyui-image-manager-default-secret-key-change-this";
+        return crypto_12.default.createHash("sha256").update(secret).digest();
+      }
+      static encrypt(plaintext) {
+        if (!plaintext) {
+          return "";
+        }
+        const key = this.getEncryptionKey();
+        const iv = crypto_12.default.randomBytes(this.IV_LENGTH);
+        const cipher = crypto_12.default.createCipheriv(this.ALGORITHM, key, iv);
+        let encrypted = cipher.update(plaintext, "utf8", "hex");
+        encrypted += cipher.final("hex");
+        const authTag = cipher.getAuthTag();
+        return `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted}`;
+      }
+      static decrypt(encryptedData) {
+        if (!encryptedData) {
+          return "";
+        }
+        try {
+          const key = this.getEncryptionKey();
+          const parts = encryptedData.split(":");
+          if (parts.length !== 3) {
+            throw new Error("Invalid encrypted data format");
+          }
+          const iv = Buffer.from(parts[0], "hex");
+          const authTag = Buffer.from(parts[1], "hex");
+          const encrypted = parts[2];
+          const decipher = crypto_12.default.createDecipheriv(this.ALGORITHM, key, iv);
+          decipher.setAuthTag(authTag);
+          let decrypted = decipher.update(encrypted, "hex", "utf8");
+          decrypted += decipher.final("utf8");
+          return decrypted;
+        } catch (error) {
+          console.error("Failed to decrypt API key:", error);
+          throw new Error("Failed to decrypt API key");
+        }
+      }
+      static maskApiKey(apiKey) {
+        if (!apiKey || apiKey.length <= 8) {
+          return "********";
+        }
+        const firstPart = apiKey.substring(0, 4);
+        const lastPart = apiKey.substring(apiKey.length - 4);
+        return `${firstPart}***...***${lastPart}`;
+      }
+      static async testCivitaiConnection(apiKey) {
+        try {
+          const response = await fetch("https://civitai.com/api/v1/models?limit=1", {
+            headers: {
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json"
+            }
+          });
+          return response.ok;
+        } catch (error) {
+          console.error("Civitai connection test failed:", error);
+          return false;
+        }
+      }
+      static async testConnection(providerName, apiKey) {
+        switch (providerName) {
+          case "civitai":
+            return this.testCivitaiConnection(apiKey);
+          default:
+            console.warn(`No connection test available for provider: ${providerName}`);
+            return false;
+        }
+      }
+    };
+    exports2.ExternalApiService = ExternalApiService;
+    ExternalApiService.ALGORITHM = "aes-256-gcm";
+    ExternalApiService.IV_LENGTH = 16;
+    ExternalApiService.AUTH_TAG_LENGTH = 16;
+    ExternalApiService.SALT_LENGTH = 32;
+  }
+});
+
+// backend/dist/models/ExternalApiProvider.js
+var require_ExternalApiProvider = __commonJS({
+  "backend/dist/models/ExternalApiProvider.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.ExternalApiProvider = void 0;
+    var userSettingsDb_12 = require_userSettingsDb();
+    var externalApiService_1 = require_externalApiService();
+    var ExternalApiProvider = class {
+      static findAll() {
+        const db = (0, userSettingsDb_12.getUserSettingsDb)();
+        const rows = db.prepare(`
+      SELECT * FROM external_api_providers
+      ORDER BY created_at DESC
+    `).all();
+        return rows.map((row) => this.toResponse(row));
+      }
+      static findByName(providerName) {
+        const db = (0, userSettingsDb_12.getUserSettingsDb)();
+        const row = db.prepare(`
+      SELECT * FROM external_api_providers
+      WHERE provider_name = ?
+    `).get(providerName);
+        if (!row) {
+          return null;
+        }
+        return this.toResponse(row);
+      }
+      static getDecryptedKey(providerName) {
+        const db = (0, userSettingsDb_12.getUserSettingsDb)();
+        const row = db.prepare(`
+      SELECT api_key, is_enabled FROM external_api_providers
+      WHERE provider_name = ?
+    `).get(providerName);
+        if (!row || !row.is_enabled || !row.api_key) {
+          return null;
+        }
+        try {
+          return externalApiService_1.ExternalApiService.decrypt(row.api_key);
+        } catch (error) {
+          console.error(`Failed to decrypt API key for ${providerName}:`, error);
+          return null;
+        }
+      }
+      static getDecryptedSecret(providerName) {
+        const db = (0, userSettingsDb_12.getUserSettingsDb)();
+        const row = db.prepare(`
+      SELECT api_secret, is_enabled FROM external_api_providers
+      WHERE provider_name = ?
+    `).get(providerName);
+        if (!row || !row.is_enabled || !row.api_secret) {
+          return null;
+        }
+        try {
+          return externalApiService_1.ExternalApiService.decrypt(row.api_secret);
+        } catch (error) {
+          console.error(`Failed to decrypt API secret for ${providerName}:`, error);
+          return null;
+        }
+      }
+      static create(input) {
+        const db = (0, userSettingsDb_12.getUserSettingsDb)();
+        const encryptedKey = input.api_key ? externalApiService_1.ExternalApiService.encrypt(input.api_key) : null;
+        const encryptedSecret = input.api_secret ? externalApiService_1.ExternalApiService.encrypt(input.api_secret) : null;
+        const additionalConfig = input.additional_config ? JSON.stringify(input.additional_config) : null;
+        let isEnabled;
+        if (input.is_enabled !== void 0) {
+          isEnabled = input.is_enabled ? 1 : 0;
+        } else {
+          isEnabled = encryptedKey ? 1 : 0;
+        }
+        const result = db.prepare(`
+      INSERT INTO external_api_providers (
+        provider_name,
+        display_name,
+        api_key,
+        api_secret,
+        base_url,
+        additional_config,
+        is_enabled
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(input.provider_name, input.display_name, encryptedKey, encryptedSecret, input.base_url || null, additionalConfig, isEnabled);
+        return result.lastInsertRowid;
+      }
+      static update(providerName, input) {
+        const db = (0, userSettingsDb_12.getUserSettingsDb)();
+        const updates = [];
+        const values = [];
+        if (input.display_name !== void 0) {
+          updates.push("display_name = ?");
+          values.push(input.display_name);
+        }
+        if (input.api_key !== void 0) {
+          updates.push("api_key = ?");
+          values.push(input.api_key ? externalApiService_1.ExternalApiService.encrypt(input.api_key) : null);
+        }
+        if (input.api_secret !== void 0) {
+          updates.push("api_secret = ?");
+          values.push(input.api_secret ? externalApiService_1.ExternalApiService.encrypt(input.api_secret) : null);
+        }
+        if (input.base_url !== void 0) {
+          updates.push("base_url = ?");
+          values.push(input.base_url || null);
+        }
+        if (input.additional_config !== void 0) {
+          updates.push("additional_config = ?");
+          values.push(input.additional_config ? JSON.stringify(input.additional_config) : null);
+        }
+        if (input.is_enabled !== void 0) {
+          updates.push("is_enabled = ?");
+          values.push(input.is_enabled ? 1 : 0);
+        }
+        if (updates.length === 0) {
+          return false;
+        }
+        updates.push("updated_at = CURRENT_TIMESTAMP");
+        values.push(providerName);
+        const result = db.prepare(`
+      UPDATE external_api_providers
+      SET ${updates.join(", ")}
+      WHERE provider_name = ?
+    `).run(...values);
+        return result.changes > 0;
+      }
+      static delete(providerName) {
+        const db = (0, userSettingsDb_12.getUserSettingsDb)();
+        const result = db.prepare(`
+      DELETE FROM external_api_providers
+      WHERE provider_name = ?
+    `).run(providerName);
+        return result.changes > 0;
+      }
+      static toggleEnabled(providerName, isEnabled) {
+        const db = (0, userSettingsDb_12.getUserSettingsDb)();
+        const result = db.prepare(`
+      UPDATE external_api_providers
+      SET is_enabled = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE provider_name = ?
+    `).run(isEnabled ? 1 : 0, providerName);
+        return result.changes > 0;
+      }
+      static exists(providerName) {
+        const db = (0, userSettingsDb_12.getUserSettingsDb)();
+        const row = db.prepare(`
+      SELECT 1 FROM external_api_providers
+      WHERE provider_name = ?
+    `).get(providerName);
+        return !!row;
+      }
+      static toResponse(row) {
+        let maskedKey = "********";
+        let maskedSecret = null;
+        if (row.api_key) {
+          try {
+            const decryptedKey = externalApiService_1.ExternalApiService.decrypt(row.api_key);
+            maskedKey = externalApiService_1.ExternalApiService.maskApiKey(decryptedKey);
+          } catch (error) {
+            console.error(`Failed to decrypt API key for masking: ${row.provider_name}`);
+          }
+        }
+        if (row.api_secret) {
+          try {
+            const decryptedSecret = externalApiService_1.ExternalApiService.decrypt(row.api_secret);
+            maskedSecret = externalApiService_1.ExternalApiService.maskApiKey(decryptedSecret);
+          } catch (error) {
+            console.error(`Failed to decrypt API secret for masking: ${row.provider_name}`);
+          }
+        }
+        return {
+          id: row.id,
+          provider_name: row.provider_name,
+          display_name: row.display_name,
+          api_key_masked: maskedKey,
+          api_secret_masked: maskedSecret,
+          base_url: row.base_url,
+          additional_config: row.additional_config ? JSON.parse(row.additional_config) : null,
+          is_enabled: !!row.is_enabled,
+          created_at: row.created_at,
+          updated_at: row.updated_at
+        };
+      }
+    };
+    exports2.ExternalApiProvider = ExternalApiProvider;
+  }
+});
+
+// backend/dist/models/ModelInfo.js
+var require_ModelInfo = __commonJS({
+  "backend/dist/models/ModelInfo.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.ModelInfo = void 0;
+    var init_12 = require_init2();
+    var ModelInfo = class {
+      static findByHash(modelHash) {
+        const row = init_12.db.prepare(`
+      SELECT * FROM model_info WHERE model_hash = ?
+    `).get(modelHash.toUpperCase());
+        return row || null;
+      }
+      static create(input) {
+        const result = init_12.db.prepare(`
+      INSERT INTO model_info (
+        model_hash, model_name, model_version_id, civitai_model_id,
+        model_type, civitai_data, thumbnail_path, last_checked_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).run(input.model_hash.toUpperCase(), input.model_name || null, input.model_version_id || null, input.civitai_model_id || null, input.model_type || null, input.civitai_data || null, input.thumbnail_path || null);
+        return result.lastInsertRowid;
+      }
+      static update(modelHash, input) {
+        const updates = [];
+        const values = [];
+        if (input.model_name !== void 0) {
+          updates.push("model_name = ?");
+          values.push(input.model_name);
+        }
+        if (input.model_version_id !== void 0) {
+          updates.push("model_version_id = ?");
+          values.push(input.model_version_id);
+        }
+        if (input.civitai_model_id !== void 0) {
+          updates.push("civitai_model_id = ?");
+          values.push(input.civitai_model_id);
+        }
+        if (input.model_type !== void 0) {
+          updates.push("model_type = ?");
+          values.push(input.model_type);
+        }
+        if (input.civitai_data !== void 0) {
+          updates.push("civitai_data = ?");
+          values.push(input.civitai_data);
+        }
+        if (input.thumbnail_path !== void 0) {
+          updates.push("thumbnail_path = ?");
+          values.push(input.thumbnail_path);
+        }
+        if (updates.length === 0)
+          return false;
+        updates.push("updated_at = CURRENT_TIMESTAMP");
+        updates.push("last_checked_at = CURRENT_TIMESTAMP");
+        values.push(modelHash.toUpperCase());
+        const result = init_12.db.prepare(`
+      UPDATE model_info SET ${updates.join(", ")} WHERE model_hash = ?
+    `).run(...values);
+        return result.changes > 0;
+      }
+      static findAll(limit = 100, offset = 0) {
+        return init_12.db.prepare(`
+      SELECT * FROM model_info
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
+      }
+      static findByType(modelType) {
+        return init_12.db.prepare(`
+      SELECT * FROM model_info WHERE model_type = ?
+      ORDER BY model_name ASC
+    `).all(modelType);
+      }
+      static delete(modelHash) {
+        const result = init_12.db.prepare(`DELETE FROM model_info WHERE model_hash = ?`).run(modelHash.toUpperCase());
+        return result.changes > 0;
+      }
+      static clearAll() {
+        const result = init_12.db.prepare(`DELETE FROM model_info`).run();
+        return result.changes;
+      }
+    };
+    exports2.ModelInfo = ModelInfo;
+  }
+});
+
+// backend/dist/models/ImageModel.js
+var require_ImageModel = __commonJS({
+  "backend/dist/models/ImageModel.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.ImageModel = void 0;
+    var init_12 = require_init2();
+    var ImageModel = class {
+      static findByCompositeHash(compositeHash) {
+        return init_12.db.prepare(`
+      SELECT * FROM image_models WHERE composite_hash = ?
+      ORDER BY model_role, created_at
+    `).all(compositeHash);
+      }
+      static findByModelHash(modelHash) {
+        return init_12.db.prepare(`
+      SELECT * FROM image_models WHERE model_hash = ?
+    `).all(modelHash.toUpperCase());
+      }
+      static create(input) {
+        const result = init_12.db.prepare(`
+      INSERT OR IGNORE INTO image_models (
+        composite_hash, model_hash, model_role, weight
+      ) VALUES (?, ?, ?, ?)
+    `).run(input.composite_hash, input.model_hash.toUpperCase(), input.model_role, input.weight ?? null);
+        return result.lastInsertRowid;
+      }
+      static createMany(compositeHash, models) {
+        const stmt = init_12.db.prepare(`
+      INSERT OR IGNORE INTO image_models (
+        composite_hash, model_hash, model_role, weight
+      ) VALUES (?, ?, ?, ?)
+    `);
+        let count = 0;
+        const insertMany = init_12.db.transaction((items) => {
+          for (const model of items) {
+            const result = stmt.run(compositeHash, model.model_hash.toUpperCase(), model.model_role, model.weight ?? null);
+            if (result.changes > 0)
+              count++;
+          }
+        });
+        insertMany(models);
+        return count;
+      }
+      static getUncheckedModels(compositeHash, limit = 50) {
+        if (compositeHash) {
+          return init_12.db.prepare(`
+        SELECT * FROM image_models
+        WHERE composite_hash = ? AND civitai_checked = 0 AND civitai_failed = 0
+        LIMIT ?
+      `).all(compositeHash, limit);
+        }
+        return init_12.db.prepare(`
+      SELECT * FROM image_models
+      WHERE civitai_checked = 0 AND civitai_failed = 0
+      LIMIT ?
+    `).all(limit);
+      }
+      static markAsChecked(id, failed = false) {
+        const result = init_12.db.prepare(`
+      UPDATE image_models
+      SET civitai_checked = 1, civitai_failed = ?, checked_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(failed ? 1 : 0, id);
+        return result.changes > 0;
+      }
+      static markHashAsChecked(modelHash, failed = false) {
+        const result = init_12.db.prepare(`
+      UPDATE image_models
+      SET civitai_checked = 1, civitai_failed = ?, checked_at = CURRENT_TIMESTAMP
+      WHERE model_hash = ? AND civitai_checked = 0
+    `).run(failed ? 1 : 0, modelHash.toUpperCase());
+        return result.changes;
+      }
+      static resetFailed() {
+        const result = init_12.db.prepare(`
+      UPDATE image_models
+      SET civitai_checked = 0, civitai_failed = 0, checked_at = NULL
+      WHERE civitai_failed = 1
+    `).run();
+        return result.changes;
+      }
+      static deleteByCompositeHash(compositeHash) {
+        const result = init_12.db.prepare(`DELETE FROM image_models WHERE composite_hash = ?`).run(compositeHash);
+        return result.changes;
+      }
+    };
+    exports2.ImageModel = ImageModel;
+  }
+});
+
+// backend/dist/models/CivitaiSettings.js
+var require_CivitaiSettings = __commonJS({
+  "backend/dist/models/CivitaiSettings.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.CivitaiSettings = void 0;
+    var init_12 = require_init2();
+    var CivitaiSettings = class {
+      static get() {
+        const row = init_12.db.prepare(`SELECT * FROM civitai_settings WHERE id = 1`).get();
+        if (!row) {
+          return {
+            enabled: false,
+            apiCallInterval: 2,
+            totalLookups: 0,
+            successfulLookups: 0,
+            failedLookups: 0,
+            lastApiCall: null
+          };
+        }
+        return {
+          enabled: !!row.enabled,
+          apiCallInterval: row.api_call_interval,
+          totalLookups: row.total_lookups,
+          successfulLookups: row.successful_lookups,
+          failedLookups: row.failed_lookups,
+          lastApiCall: row.last_api_call
+        };
+      }
+      static update(settings) {
+        const updates = [];
+        const values = [];
+        if (settings.enabled !== void 0) {
+          updates.push("enabled = ?");
+          values.push(settings.enabled ? 1 : 0);
+        }
+        if (settings.apiCallInterval !== void 0) {
+          updates.push("api_call_interval = ?");
+          values.push(Math.max(1, Math.min(10, settings.apiCallInterval)));
+        }
+        if (updates.length === 0)
+          return false;
+        updates.push("updated_at = CURRENT_TIMESTAMP");
+        const result = init_12.db.prepare(`
+      UPDATE civitai_settings SET ${updates.join(", ")} WHERE id = 1
+    `).run(...values);
+        return result.changes > 0;
+      }
+      static incrementSuccess() {
+        init_12.db.prepare(`
+      UPDATE civitai_settings
+      SET total_lookups = total_lookups + 1,
+          successful_lookups = successful_lookups + 1,
+          last_api_call = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = 1
+    `).run();
+      }
+      static incrementFailure() {
+        init_12.db.prepare(`
+      UPDATE civitai_settings
+      SET total_lookups = total_lookups + 1,
+          failed_lookups = failed_lookups + 1,
+          last_api_call = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = 1
+    `).run();
+      }
+      static resetStats() {
+        init_12.db.prepare(`
+      UPDATE civitai_settings
+      SET total_lookups = 0, successful_lookups = 0, failed_lookups = 0,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = 1
+    `).run();
+      }
+    };
+    exports2.CivitaiSettings = CivitaiSettings;
+  }
+});
+
+// backend/dist/services/civitaiService.js
+var require_civitaiService = __commonJS({
+  "backend/dist/services/civitaiService.js"(exports2) {
+    "use strict";
+    var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
+      return mod && mod.__esModule ? mod : { "default": mod };
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.CivitaiService = void 0;
+    var fs_12 = __importDefault2(require("fs"));
+    var path_12 = __importDefault2(require("path"));
+    var sharp_1 = __importDefault2(require("sharp"));
+    var ExternalApiProvider_1 = require_ExternalApiProvider();
+    var ModelInfo_1 = require_ModelInfo();
+    var ImageModel_1 = require_ImageModel();
+    var CivitaiSettings_1 = require_CivitaiSettings();
+    var runtimePaths_12 = require_runtimePaths();
+    var CIVITAI_API_BASE = "https://civitai.com/api/v1";
+    var PROVIDER_NAME = "civitai";
+    var CivitaiService = class {
+      static getApiKey() {
+        return ExternalApiProvider_1.ExternalApiProvider.getDecryptedKey(PROVIDER_NAME);
+      }
+      static async isEnabled() {
+        const settings = CivitaiSettings_1.CivitaiSettings.get();
+        return settings.enabled;
+      }
+      static async getModelByHash(hash) {
+        const settings = CivitaiSettings_1.CivitaiSettings.get();
+        if (!settings.enabled) {
+          return null;
+        }
+        const apiKey = this.getApiKey();
+        const headers = {
+          "Content-Type": "application/json"
+        };
+        if (apiKey) {
+          headers["Authorization"] = `Bearer ${apiKey}`;
+        }
+        try {
+          const response = await fetch(`${CIVITAI_API_BASE}/model-versions/by-hash/${hash.toUpperCase()}`, { headers });
+          if (!response.ok) {
+            if (response.status === 404) {
+              console.log(`[Civitai] Model not found for hash: ${hash}`);
+              return null;
+            }
+            throw new Error(`Civitai API error: ${response.status}`);
+          }
+          const data = await response.json();
+          return data;
+        } catch (error) {
+          console.error("[Civitai] API call failed:", error);
+          throw error;
+        }
+      }
+      static ensureThumbnailDir() {
+        if (!fs_12.default.existsSync(this.thumbnailDir)) {
+          fs_12.default.mkdirSync(this.thumbnailDir, { recursive: true });
+        }
+      }
+      static async downloadThumbnail(url, hash) {
+        try {
+          this.ensureThumbnailDir();
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`Failed to download thumbnail: ${response.status}`);
+          }
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const contentType = response.headers.get("content-type") || "";
+          const isVideo = contentType.startsWith("video/");
+          if (isVideo) {
+            const ext = this.getExtensionFromUrl(url) || ".mp4";
+            const filename = `${hash.toUpperCase()}${ext}`;
+            const filepath = path_12.default.join(this.thumbnailDir, filename);
+            fs_12.default.writeFileSync(filepath, buffer);
+            console.log(`[Civitai] Video thumbnail saved: ${filepath}`);
+            return filepath;
+          } else {
+            const filename = `${hash.toUpperCase()}.webp`;
+            const filepath = path_12.default.join(this.thumbnailDir, filename);
+            await (0, sharp_1.default)(buffer).webp({
+              quality: 90,
+              effort: 4
+            }).toFile(filepath);
+            console.log(`[Civitai] Image thumbnail converted to WebP: ${filepath}`);
+            return filepath;
+          }
+        } catch (error) {
+          console.error("[Civitai] Thumbnail download failed:", error);
+          return null;
+        }
+      }
+      static getExtensionFromUrl(url) {
+        try {
+          const urlPath = new URL(url).pathname;
+          const match = urlPath.match(/\.(mp4|webm|mov|avi)$/i);
+          return match ? match[0] : null;
+        } catch {
+          return null;
+        }
+      }
+      static async lookupAndCacheModel(modelHash) {
+        const cached = ModelInfo_1.ModelInfo.findByHash(modelHash);
+        if (cached) {
+          ImageModel_1.ImageModel.markHashAsChecked(modelHash, false);
+          return true;
+        }
+        try {
+          const data = await this.getModelByHash(modelHash);
+          if (!data) {
+            CivitaiSettings_1.CivitaiSettings.incrementFailure();
+            ImageModel_1.ImageModel.markHashAsChecked(modelHash, true);
+            return false;
+          }
+          let thumbnailPath = null;
+          if (data.images && data.images.length > 0) {
+            thumbnailPath = await this.downloadThumbnail(data.images[0].url, modelHash);
+          }
+          const input = {
+            model_hash: modelHash,
+            model_name: data.model.name,
+            model_version_id: data.id.toString(),
+            civitai_model_id: data.modelId,
+            model_type: data.model.type.toLowerCase(),
+            civitai_data: JSON.stringify(data),
+            thumbnail_path: thumbnailPath || void 0
+          };
+          ModelInfo_1.ModelInfo.create(input);
+          CivitaiSettings_1.CivitaiSettings.incrementSuccess();
+          ImageModel_1.ImageModel.markHashAsChecked(modelHash, false);
+          console.log(`[Civitai] Model cached: ${data.model.name} (${modelHash})`);
+          return true;
+        } catch (error) {
+          CivitaiSettings_1.CivitaiSettings.incrementFailure();
+          ImageModel_1.ImageModel.markHashAsChecked(modelHash, true);
+          console.error(`[Civitai] Lookup failed for ${modelHash}:`, error);
+          return false;
+        }
+      }
+      static async waitForRateLimit() {
+        const settings = CivitaiSettings_1.CivitaiSettings.get();
+        await new Promise((resolve) => setTimeout(resolve, settings.apiCallInterval * 1e3));
+      }
+      static getThumbnailPath(hash) {
+        const jpgPath = path_12.default.join(this.thumbnailDir, `${hash.toUpperCase()}.jpg`);
+        const pngPath = path_12.default.join(this.thumbnailDir, `${hash.toUpperCase()}.png`);
+        if (fs_12.default.existsSync(jpgPath))
+          return jpgPath;
+        if (fs_12.default.existsSync(pngPath))
+          return pngPath;
+        return null;
+      }
+    };
+    exports2.CivitaiService = CivitaiService;
+    CivitaiService.thumbnailDir = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, "civitai", "thumbnails");
+  }
+});
+
 // backend/dist/services/backgroundQueue.js
 var require_backgroundQueue = __commonJS({
   "backend/dist/services/backgroundQueue.js"(exports2) {
@@ -66129,10 +67725,15 @@ var require_backgroundQueue = __commonJS({
     var QueryCacheService_12 = require_QueryCacheService();
     var promptCollectionService_1 = require_promptCollectionService();
     var autoCollectionService_1 = require_autoCollectionService();
+    var errors_1 = require_errors();
+    var civitaiService_1 = require_civitaiService();
+    var ImageModel_1 = require_ImageModel();
+    var CivitaiSettings_1 = require_CivitaiSettings();
     var TaskType;
     (function(TaskType2) {
       TaskType2["METADATA_EXTRACTION"] = "metadata_extraction";
       TaskType2["PROMPT_COLLECTION"] = "prompt_collection";
+      TaskType2["CIVITAI_MODEL_LOOKUP"] = "civitai_model_lookup";
     })(TaskType || (exports2.TaskType = TaskType = {}));
     var BackgroundQueueService = class {
       static addMetadataExtractionTask(filePath, compositeHash) {
@@ -66165,6 +67766,27 @@ var require_backgroundQueue = __commonJS({
         };
         this.queue.push(task);
         console.log(`  \u{1F4CB} \uBC31\uADF8\uB77C\uC6B4\uB4DC \uC791\uC5C5 \uCD94\uAC00: \uD504\uB86C\uD504\uD2B8 \uC218\uC9D1 - ${path_12.default.basename(filePath)}`);
+        if (!this.processing) {
+          this.processQueue();
+        }
+      }
+      static addCivitaiModelLookupTask(compositeHash, modelReferences) {
+        const refsWithHash = modelReferences.filter((ref) => ref.hash);
+        if (refsWithHash.length === 0)
+          return;
+        const task = {
+          id: `${compositeHash}_civitai_${Date.now()}`,
+          type: TaskType.CIVITAI_MODEL_LOOKUP,
+          filePath: "",
+          compositeHash,
+          priority: 5,
+          retries: 0,
+          maxRetries: 1,
+          createdAt: /* @__PURE__ */ new Date(),
+          modelReferences: refsWithHash
+        };
+        this.queue.push(task);
+        console.log(`  \u{1F4CB} \uBC31\uADF8\uB77C\uC6B4\uB4DC \uC791\uC5C5 \uCD94\uAC00: Civitai \uBAA8\uB378 \uC870\uD68C (${refsWithHash.length}\uAC1C)`);
         if (!this.processing) {
           this.processQueue();
         }
@@ -66206,17 +67828,29 @@ var require_backgroundQueue = __commonJS({
             case TaskType.PROMPT_COLLECTION:
               await this.processPromptCollection(task);
               break;
+            case TaskType.CIVITAI_MODEL_LOOKUP:
+              await this.processCivitaiModelLookup(task);
+              break;
             default:
               console.warn(`  \u26A0\uFE0F  \uC54C \uC218 \uC5C6\uB294 \uC791\uC5C5 \uD0C0\uC785: ${task.type}`);
           }
         } catch (error) {
-          console.error(`  \u274C \uC791\uC5C5 \uCC98\uB9AC \uC2E4\uD328: ${task.id}`, error);
+          if (error instanceof errors_1.MetadataExtractionError) {
+            if (!error.retryable) {
+              console.log(`  \u23ED\uFE0F  \uC7AC\uC2DC\uB3C4 \uBD88\uD544\uC694\uD55C \uC624\uB958: ${error.type} - ${error.message}`);
+              return;
+            }
+            console.error(`  \u274C \uC7AC\uC2DC\uB3C4 \uAC00\uB2A5\uD55C \uC624\uB958: ${error.type} - ${error.message}`);
+          } else {
+            console.error(`  \u274C \uC791\uC5C5 \uCC98\uB9AC \uC2E4\uD328: ${task.id}`, error);
+          }
           throw error;
         }
       }
       static async processMetadataExtraction(task) {
         const aiMetadata = await metadata_1.MetadataExtractor.extractMetadata(task.filePath);
         const aiInfo = aiMetadata.ai_info || {};
+        const modelReferencesJson = aiInfo.model_references && aiInfo.model_references.length > 0 ? JSON.stringify(aiInfo.model_references) : null;
         init_12.db.prepare(`
       UPDATE media_metadata
       SET
@@ -66232,9 +67866,10 @@ var require_backgroundQueue = __commonJS({
         denoise_strength = ?,
         generation_time = ?,
         batch_size = ?,
-        batch_index = ?
+        batch_index = ?,
+        model_references = ?
       WHERE composite_hash = ?
-    `).run(aiInfo.ai_tool || null, aiInfo.model || null, aiInfo.steps || null, aiInfo.cfg_scale || null, aiInfo.sampler || null, aiInfo.seed || null, aiInfo.scheduler || null, aiInfo.prompt || null, aiInfo.negative_prompt || null, aiInfo.denoise_strength || null, aiInfo.generation_time || null, aiInfo.batch_size || null, aiInfo.batch_index || null, task.compositeHash);
+    `).run(aiInfo.ai_tool || null, aiInfo.model || null, aiInfo.steps || null, aiInfo.cfg_scale || null, aiInfo.sampler || null, aiInfo.seed || null, aiInfo.scheduler || null, aiInfo.prompt || null, aiInfo.negative_prompt || null, aiInfo.denoise_strength || null, aiInfo.generation_time || null, aiInfo.batch_size || null, aiInfo.batch_index || null, modelReferencesJson, task.compositeHash);
         console.log(`  \u2705 \uBA54\uD0C0\uB370\uC774\uD130 \uCD94\uCD9C \uC644\uB8CC: ${path_12.default.basename(task.filePath)}`);
         try {
           console.log(`  \u{1F50D} Running auto-collection (after metadata extraction)...`);
@@ -66252,6 +67887,13 @@ var require_backgroundQueue = __commonJS({
             console.warn(`  \u26A0\uFE0F  \uD504\uB86C\uD504\uD2B8 \uC218\uC9D1 \uC791\uC5C5 \uCD94\uAC00 \uC2E4\uD328: ${path_12.default.basename(task.filePath)}`, error);
           }
         }
+        if (aiInfo.model_references && aiInfo.model_references.length > 0) {
+          try {
+            this.addCivitaiModelLookupTask(task.compositeHash, aiInfo.model_references);
+          } catch (error) {
+            console.warn(`  \u26A0\uFE0F  Civitai \uC870\uD68C \uC791\uC5C5 \uCD94\uAC00 \uC2E4\uD328: ${path_12.default.basename(task.filePath)}`, error);
+          }
+        }
         QueryCacheService_12.QueryCacheService.invalidateGalleryCache();
       }
       static async processPromptCollection(task) {
@@ -66263,10 +67905,42 @@ var require_backgroundQueue = __commonJS({
         await promptCollectionService_1.PromptCollectionService.collectFromImage(metadata.prompt, metadata.negative_prompt);
         console.log(`  \u2705 \uD504\uB86C\uD504\uD2B8 \uC218\uC9D1 \uC644\uB8CC: ${path_12.default.basename(task.filePath)}`);
       }
+      static async processCivitaiModelLookup(task) {
+        const settings = CivitaiSettings_1.CivitaiSettings.get();
+        if (!settings.enabled) {
+          console.log(`  \u23ED\uFE0F  Civitai \uAE30\uB2A5 \uBE44\uD65C\uC131\uD654`);
+          return;
+        }
+        if (!task.modelReferences || task.modelReferences.length === 0) {
+          return;
+        }
+        for (const ref of task.modelReferences) {
+          ImageModel_1.ImageModel.create({
+            composite_hash: task.compositeHash,
+            model_hash: ref.hash,
+            model_role: ref.type,
+            weight: ref.weight
+          });
+        }
+        for (const ref of task.modelReferences) {
+          try {
+            await civitaiService_1.CivitaiService.waitForRateLimit();
+            const success = await civitaiService_1.CivitaiService.lookupAndCacheModel(ref.hash);
+            if (success) {
+              console.log(`  \u2705 Civitai \uBAA8\uB378 \uC815\uBCF4 \uCE90\uC2F1: ${ref.name} (${ref.hash})`);
+            } else {
+              console.log(`  \u23ED\uFE0F  Civitai\uC5D0\uC11C \uBAA8\uB378 \uCC3E\uC9C0 \uBABB\uD568: ${ref.name} (${ref.hash})`);
+            }
+          } catch (error) {
+            console.error(`  \u274C Civitai \uC870\uD68C \uC2E4\uD328: ${ref.hash}`, error);
+          }
+        }
+      }
       static getQueueStatus() {
         const tasksByType = {
           [TaskType.METADATA_EXTRACTION]: 0,
-          [TaskType.PROMPT_COLLECTION]: 0
+          [TaskType.PROMPT_COLLECTION]: 0,
+          [TaskType.CIVITAI_MODEL_LOOKUP]: 0
         };
         this.queue.forEach((task) => {
           tasksByType[task.type]++;
@@ -66348,7 +68022,6 @@ var require_backgroundProcessorService = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.BackgroundProcessorService = void 0;
     var path_12 = __importDefault2(require("path"));
-    var fs_12 = __importDefault2(require("fs"));
     var os_1 = __importDefault2(require("os"));
     var p_limit_1 = __importDefault2(require_p_limit());
     var sharp_1 = __importDefault2(require("sharp"));
@@ -66359,6 +68032,8 @@ var require_backgroundProcessorService = __commonJS({
     var videoProcessor_1 = require_videoProcessor();
     var thumbnailGenerator_1 = require_thumbnailGenerator();
     var autoCollectionService_1 = require_autoCollectionService();
+    var fileAccess_1 = require_fileAccess();
+    var errors_1 = require_errors();
     var BackgroundProcessorService = class {
       static async processUnhashedImages() {
         if (this.processing) {
@@ -66417,10 +68092,16 @@ var require_backgroundProcessorService = __commonJS({
       }
       static async processFile(file) {
         const fileName = path_12.default.basename(file.original_file_path);
-        if (!fs_12.default.existsSync(file.original_file_path)) {
+        const access = await (0, fileAccess_1.checkFileAccess)(file.original_file_path);
+        if (!access.exists) {
           console.log(`  \u26A0\uFE0F  File not found, deleting DB record: ${fileName}`);
           init_12.db.prepare(`DELETE FROM image_files WHERE id = ?`).run(file.id);
           return;
+        }
+        if (!access.readable) {
+          const errorMsg = access.errorCode === "EACCES" ? `Permission denied (read): ${fileName}` : `Cannot read file: ${fileName}`;
+          console.error(`  \u274C ${errorMsg}`);
+          throw errors_1.MetadataExtractionError.fromNodeError(file.original_file_path, { code: access.errorCode, message: access.error });
         }
         if (file.file_type === "video" || file.file_type === "animated") {
           await this.processVideoFile(file);
@@ -66888,66 +68569,39 @@ var require_similarity_routes = __commonJS({
       }
     }));
     router.delete("/files/bulk", (0, errorHandler_12.asyncHandler)(async (req, res) => {
-      try {
-        const { fileIds } = req.body;
-        if (!Array.isArray(fileIds) || fileIds.length === 0) {
-          return res.status(400).json((0, shared_12.errorResponse)("fileIds must be a non-empty array"));
-        }
-        const validFileIds = fileIds.filter((id) => typeof id === "number" && !isNaN(id));
-        if (validFileIds.length !== fileIds.length) {
-          return res.status(400).json((0, shared_12.errorResponse)("All fileIds must be valid numbers"));
-        }
-        const fs = await Promise.resolve().then(() => __importStar2(require("fs/promises")));
-        const deletedFiles = [];
-        const failedFiles = [];
-        const orphanedHashes = [];
-        const deleteStmt = init_12.db.prepare("DELETE FROM image_files WHERE id = ?");
-        const getFileStmt = init_12.db.prepare("SELECT id, file_path, composite_hash FROM image_files WHERE id = ?");
-        const checkRemainingStmt = init_12.db.prepare("SELECT COUNT(*) as count FROM image_files WHERE composite_hash = ?");
-        const deleteMetadataStmt = init_12.db.prepare("DELETE FROM media_metadata WHERE composite_hash = ?");
-        for (const fileId of validFileIds) {
-          try {
-            const fileRecord = getFileStmt.get(fileId);
-            if (!fileRecord) {
-              failedFiles.push({ fileId, error: "File not found" });
-              continue;
-            }
-            const filePath = path_12.default.join(UPLOAD_BASE_PATH, fileRecord.file_path);
-            const compositeHash = fileRecord.composite_hash;
-            try {
-              await fs.unlink(filePath);
-            } catch (fsError) {
-              console.warn(`Physical file not found: ${filePath}`);
-            }
-            const result = deleteStmt.run(fileId);
-            if (result.changes > 0) {
-              deletedFiles.push(fileId);
-              if (compositeHash) {
-                const remaining = checkRemainingStmt.get(compositeHash);
-                if (remaining.count === 0) {
-                  deleteMetadataStmt.run(compositeHash);
-                  orphanedHashes.push(compositeHash);
-                }
-              }
-            } else {
-              failedFiles.push({ fileId, error: "Failed to delete from database" });
-            }
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Unknown error";
-            failedFiles.push({ fileId, error: errorMessage });
-          }
-        }
-        return res.json((0, shared_12.successResponse)({
-          message: `Deleted ${deletedFiles.length} files, ${failedFiles.length} failed`,
-          deletedFiles,
-          failedFiles: failedFiles.length > 0 ? failedFiles : void 0,
-          orphanedMetadataRemoved: orphanedHashes.length,
-          total: fileIds.length
-        }));
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Failed to delete files";
-        return res.status(500).json((0, shared_12.errorResponse)(errorMessage));
+      const { fileIds } = req.body;
+      if (!Array.isArray(fileIds) || fileIds.length === 0) {
+        return res.status(400).json((0, shared_12.errorResponse)("fileIds must be a non-empty array"));
       }
+      const validFileIds = fileIds.filter((id) => typeof id === "number" && !isNaN(id));
+      if (validFileIds.length !== fileIds.length) {
+        return res.status(400).json((0, shared_12.errorResponse)("All fileIds must be valid numbers"));
+      }
+      const { DeletionService } = await Promise.resolve().then(() => __importStar2(require_deletionService()));
+      const deletedFiles = [];
+      const failedFiles = [];
+      console.log(`\u{1F5D1}\uFE0F Starting bulk file deletion: ${validFileIds.length} files`);
+      for (const fileId of validFileIds) {
+        try {
+          const success = await DeletionService.deleteImageFile(fileId);
+          if (success) {
+            deletedFiles.push(fileId);
+          } else {
+            failedFiles.push({ fileId, error: "File not found" });
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : "Unknown error";
+          console.error(`\u274C Error deleting file_id ${fileId}:`, error);
+          failedFiles.push({ fileId, error: errorMessage });
+        }
+      }
+      console.log(`\u2705 Bulk deletion completed: ${deletedFiles.length} success, ${failedFiles.length} failed`);
+      return res.json((0, shared_12.successResponse)({
+        message: `Deleted ${deletedFiles.length} files${failedFiles.length > 0 ? `, ${failedFiles.length} failed` : ""}`,
+        deletedFiles,
+        failedFiles: failedFiles.length > 0 ? failedFiles : void 0,
+        total: fileIds.length
+      }));
     }));
     router.get("/similarity/stats", (0, errorHandler_12.asyncHandler)(async (req, res) => {
       try {
@@ -67288,8 +68942,8 @@ var require_images = __commonJS({
     router.use("/", hash_routes_1.default);
     router.use("/", query_routes_1.queryRoutes);
     router.use("/search/complex", complex_search_routes_1.default);
-    router.use("/", management_routes_1.managementRoutes);
     router.use("/", similarity_routes_1.similarityRoutes);
+    router.use("/", management_routes_1.managementRoutes);
   }
 });
 
@@ -68591,7 +70245,7 @@ var require_constants = __commonJS({
 });
 
 // node_modules/adm-zip/util/errors.js
-var require_errors = __commonJS({
+var require_errors2 = __commonJS({
   "node_modules/adm-zip/util/errors.js"(exports2) {
     var errors = {
       /* Header error messages */
@@ -68656,7 +70310,7 @@ var require_utils5 = __commonJS({
     var fsystem = require("fs");
     var pth = require("path");
     var Constants = require_constants();
-    var Errors = require_errors();
+    var Errors = require_errors2();
     var isWin = typeof process === "object" && "win32" === process.platform;
     var is_Obj = (obj) => typeof obj === "object" && obj !== null;
     var crcTable = new Uint32Array(256).map((t, c) => {
@@ -68993,7 +70647,7 @@ var require_util3 = __commonJS({
   "node_modules/adm-zip/util/index.js"(exports2, module2) {
     module2.exports = require_utils5();
     module2.exports.Constants = require_constants();
-    module2.exports.Errors = require_errors();
+    module2.exports.Errors = require_errors2();
     module2.exports.FileAttr = require_fattr();
     module2.exports.decoder = require_decoder();
   }
@@ -69440,7 +71094,7 @@ var require_zipcrypto = __commonJS({
   "node_modules/adm-zip/methods/zipcrypto.js"(exports2, module2) {
     "use strict";
     var { randomFillSync: randomFillSync2 } = require("crypto");
-    var Errors = require_errors();
+    var Errors = require_errors2();
     var crctable = new Uint32Array(256).map((t, crc) => {
       for (let j = 0; j < 8; j++) {
         if (0 !== (crc & 1)) {
@@ -71132,7 +72786,7 @@ var require_groupDownloadService = __commonJS({
               }
             }
             if (!filePath && image.thumbnail_path) {
-              filePath = (0, runtimePaths_12.resolveUploadsPath)(image.thumbnail_path);
+              filePath = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, image.thumbnail_path);
               fileExtension = path_12.default.extname(image.thumbnail_path) || ".jpg";
             }
           } else if (downloadType === "video") {
@@ -71156,6 +72810,13 @@ var require_groupDownloadService = __commonJS({
               filePath,
               originalName: finalName,
               compositeHash: image.composite_hash
+            });
+          } else {
+            console.warn(`[GroupDownload] File not found for ${downloadType}:`, {
+              composite_hash: image.composite_hash,
+              filePath,
+              thumbnail_path: image.thumbnail_path,
+              original_file_path: image.original_file_path
             });
           }
         }
@@ -83288,283 +84949,6 @@ var require_settings5 = __commonJS({
   }
 });
 
-// backend/dist/database/userSettingsDb.js
-var require_userSettingsDb = __commonJS({
-  "backend/dist/database/userSettingsDb.js"(exports2) {
-    "use strict";
-    var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
-      return mod && mod.__esModule ? mod : { "default": mod };
-    };
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.userSettingsDb = void 0;
-    exports2.initializeUserSettingsDb = initializeUserSettingsDb;
-    exports2.closeUserSettingsDb = closeUserSettingsDb;
-    exports2.getUserSettingsDb = getUserSettingsDb;
-    var better_sqlite3_1 = __importDefault2(require("better-sqlite3"));
-    var path_12 = __importDefault2(require("path"));
-    var fs_12 = __importDefault2(require("fs"));
-    var runtimePaths_12 = require_runtimePaths();
-    var USER_SETTINGS_DB_PATH = path_12.default.join(runtimePaths_12.runtimePaths.databaseDir, "user-settings.db");
-    var getMigrationsPath = () => {
-      const possiblePaths = [
-        path_12.default.join(__dirname, "../../src/database/migrations/user-settings"),
-        path_12.default.join(__dirname, "migrations/user-settings"),
-        path_12.default.join(process.cwd(), "app", "migrations", "user-settings"),
-        path_12.default.join(path_12.default.dirname(process.argv[1] || ""), "migrations", "user-settings"),
-        path_12.default.join(__dirname, "../migrations/user-settings")
-      ];
-      for (const p of possiblePaths) {
-        if (fs_12.default.existsSync(p)) {
-          return p;
-        }
-      }
-      return possiblePaths[0];
-    };
-    var MIGRATIONS_PATH = getMigrationsPath();
-    function initializeUserSettingsDb() {
-      try {
-        const dbDir = path_12.default.dirname(USER_SETTINGS_DB_PATH);
-        if (!fs_12.default.existsSync(dbDir)) {
-          fs_12.default.mkdirSync(dbDir, { recursive: true });
-        }
-        const isNewDatabase = !fs_12.default.existsSync(USER_SETTINGS_DB_PATH);
-        exports2.userSettingsDb = new better_sqlite3_1.default(USER_SETTINGS_DB_PATH);
-        if (isNewDatabase) {
-          console.log("\u2705 New user settings database created");
-        } else {
-          console.log("\u2705 Connected to existing user settings database");
-        }
-        runMigrations();
-      } catch (error) {
-        console.error("Failed to initialize user settings database:", error);
-        throw error;
-      }
-    }
-    function createMigrationsTable() {
-      exports2.userSettingsDb.exec(`
-    CREATE TABLE IF NOT EXISTS user_settings_migrations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      version VARCHAR(255) NOT NULL UNIQUE,
-      applied_date DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-    }
-    function getAppliedMigrations() {
-      const rows = exports2.userSettingsDb.prepare("SELECT version FROM user_settings_migrations ORDER BY version").all();
-      return rows.map((row) => row.version);
-    }
-    function recordMigration(version2) {
-      exports2.userSettingsDb.prepare("INSERT INTO user_settings_migrations (version) VALUES (?)").run(version2);
-    }
-    function createTables() {
-      console.log("\u{1F4CA} Creating user settings tables...");
-      exports2.userSettingsDb.exec(`
-    CREATE TABLE IF NOT EXISTS workflows (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name VARCHAR(255) NOT NULL UNIQUE,
-      description TEXT,
-      workflow_json TEXT NOT NULL,
-      marked_fields TEXT,
-      api_endpoint VARCHAR(500) DEFAULT 'http://127.0.0.1:8188',
-      is_active BOOLEAN DEFAULT 1,
-      color VARCHAR(10) DEFAULT '#2196f3',
-      created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_date DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-      exports2.userSettingsDb.exec(`
-    CREATE TABLE IF NOT EXISTS comfyui_servers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name VARCHAR(255) NOT NULL UNIQUE,
-      endpoint VARCHAR(500) NOT NULL,
-      description TEXT,
-      is_active BOOLEAN DEFAULT 1,
-      created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_date DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-      exports2.userSettingsDb.exec(`
-    CREATE TABLE IF NOT EXISTS workflow_servers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      workflow_id INTEGER NOT NULL,
-      server_id INTEGER NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (workflow_id) REFERENCES workflows(id) ON DELETE CASCADE,
-      FOREIGN KEY (server_id) REFERENCES comfyui_servers(id) ON DELETE CASCADE,
-      UNIQUE(workflow_id, server_id)
-    )
-  `);
-      exports2.userSettingsDb.exec(`
-    CREATE TABLE IF NOT EXISTS user_preferences (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      key TEXT NOT NULL UNIQUE,
-      value TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-      exports2.userSettingsDb.exec(`
-    CREATE TABLE IF NOT EXISTS wildcards (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      description TEXT,
-      is_auto_collected INTEGER DEFAULT 0,
-      source_path TEXT,
-      lora_weight REAL DEFAULT 1.0,
-      created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_date DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-      exports2.userSettingsDb.exec(`
-    CREATE TABLE IF NOT EXISTS wildcard_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      wildcard_id INTEGER NOT NULL,
-      tool TEXT NOT NULL CHECK(tool IN ('comfyui', 'nai')),
-      content TEXT NOT NULL,
-      order_index INTEGER NOT NULL DEFAULT 0,
-      created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (wildcard_id) REFERENCES wildcards(id) ON DELETE CASCADE
-    )
-  `);
-      exports2.userSettingsDb.exec(`
-    CREATE TABLE IF NOT EXISTS custom_dropdown_lists (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name VARCHAR(255) NOT NULL UNIQUE,
-      description TEXT,
-      items TEXT NOT NULL,
-      is_auto_collected INTEGER DEFAULT 0,
-      source_path TEXT,
-      created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_date DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-      const hasColumn = (tableName, columnName) => {
-        const pragma = exports2.userSettingsDb.prepare(`PRAGMA table_info(${tableName})`).all();
-        return pragma.some((col) => col.name === columnName);
-      };
-      if (!hasColumn("wildcards", "is_auto_collected")) {
-        console.log("  Migrating wildcards: adding is_auto_collected column");
-        exports2.userSettingsDb.exec("ALTER TABLE wildcards ADD COLUMN is_auto_collected INTEGER DEFAULT 0");
-      }
-      if (!hasColumn("wildcards", "source_path")) {
-        console.log("  Migrating wildcards: adding source_path column");
-        exports2.userSettingsDb.exec("ALTER TABLE wildcards ADD COLUMN source_path TEXT");
-      }
-      if (!hasColumn("wildcards", "lora_weight")) {
-        console.log("  Migrating wildcards: adding lora_weight column");
-        exports2.userSettingsDb.exec("ALTER TABLE wildcards ADD COLUMN lora_weight REAL DEFAULT 1.0");
-      }
-      if (!hasColumn("custom_dropdown_lists", "is_auto_collected")) {
-        console.log("  Migrating custom_dropdown_lists: adding is_auto_collected column");
-        exports2.userSettingsDb.exec("ALTER TABLE custom_dropdown_lists ADD COLUMN is_auto_collected INTEGER DEFAULT 0");
-      }
-      if (!hasColumn("custom_dropdown_lists", "source_path")) {
-        console.log("  Migrating custom_dropdown_lists: adding source_path column");
-        exports2.userSettingsDb.exec("ALTER TABLE custom_dropdown_lists ADD COLUMN source_path TEXT");
-      }
-      const indexes = [
-        "CREATE INDEX IF NOT EXISTS idx_workflows_name ON workflows(name)",
-        "CREATE INDEX IF NOT EXISTS idx_workflows_is_active ON workflows(is_active)",
-        "CREATE INDEX IF NOT EXISTS idx_workflows_created_date ON workflows(created_date)",
-        "CREATE INDEX IF NOT EXISTS idx_comfyui_servers_name ON comfyui_servers(name)",
-        "CREATE INDEX IF NOT EXISTS idx_comfyui_servers_active ON comfyui_servers(is_active)",
-        "CREATE INDEX IF NOT EXISTS idx_workflow_servers_workflow ON workflow_servers(workflow_id)",
-        "CREATE INDEX IF NOT EXISTS idx_workflow_servers_server ON workflow_servers(server_id)",
-        "CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(key)",
-        "CREATE INDEX IF NOT EXISTS idx_wildcards_name ON wildcards(name)",
-        "CREATE INDEX IF NOT EXISTS idx_wildcards_is_auto_collected ON wildcards(is_auto_collected)",
-        "CREATE INDEX IF NOT EXISTS idx_wildcard_items_wildcard_id ON wildcard_items(wildcard_id)",
-        "CREATE INDEX IF NOT EXISTS idx_wildcard_items_tool ON wildcard_items(tool)",
-        "CREATE INDEX IF NOT EXISTS idx_custom_dropdown_lists_name ON custom_dropdown_lists(name)",
-        "CREATE INDEX IF NOT EXISTS idx_custom_dropdown_lists_created_date ON custom_dropdown_lists(created_date)",
-        "CREATE INDEX IF NOT EXISTS idx_custom_dropdown_lists_is_auto_collected ON custom_dropdown_lists(is_auto_collected)"
-      ];
-      indexes.forEach((sql) => exports2.userSettingsDb.exec(sql));
-      exports2.userSettingsDb.prepare(`INSERT OR IGNORE INTO user_preferences (key, value) VALUES (?, ?)`).run("language", "ko");
-      console.log("  \u2705 User settings tables created (7 tables + indexes)");
-      migrateExistingTables();
-    }
-    function migrateExistingTables() {
-      console.log("\u{1F504} Checking for complex schema migrations...");
-      try {
-        const hasColumn = (tableName, columnName) => {
-          const pragma = exports2.userSettingsDb.prepare(`PRAGMA table_info(${tableName})`).all();
-          return pragma.some((col) => col.name === columnName);
-        };
-        if (hasColumn("wildcard_items", "item_text")) {
-          console.log("  Migrating wildcard_items table to new schema...");
-          exports2.userSettingsDb.exec(`
-        CREATE TABLE IF NOT EXISTS wildcard_items_new (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          wildcard_id INTEGER NOT NULL,
-          tool TEXT NOT NULL CHECK(tool IN ('comfyui', 'nai')) DEFAULT 'comfyui',
-          content TEXT NOT NULL,
-          order_index INTEGER NOT NULL DEFAULT 0,
-          created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (wildcard_id) REFERENCES wildcards(id) ON DELETE CASCADE
-        )
-      `);
-          exports2.userSettingsDb.exec(`
-        INSERT INTO wildcard_items_new (id, wildcard_id, tool, content, order_index, created_date)
-        SELECT id, wildcard_id, 'comfyui', item_text, 0, created_at
-        FROM wildcard_items
-      `);
-          exports2.userSettingsDb.exec("DROP TABLE wildcard_items");
-          exports2.userSettingsDb.exec("ALTER TABLE wildcard_items_new RENAME TO wildcard_items");
-          exports2.userSettingsDb.exec("CREATE INDEX IF NOT EXISTS idx_wildcard_items_wildcard_id ON wildcard_items(wildcard_id)");
-          exports2.userSettingsDb.exec("CREATE INDEX IF NOT EXISTS idx_wildcard_items_tool ON wildcard_items(tool)");
-          console.log("  \u2705 wildcard_items table migrated successfully");
-        } else {
-          console.log("  \u2713 No complex migrations needed");
-        }
-        console.log("  \u2705 Schema migration complete");
-      } catch (error) {
-        console.error("  \u26A0\uFE0F Error during schema migration:", error);
-      }
-    }
-    function runMigrations() {
-      createMigrationsTable();
-      if (!fs_12.default.existsSync(MIGRATIONS_PATH)) {
-        console.log("\u{1F4CA} No migrations folder found, creating tables directly...");
-        createTables();
-        return;
-      }
-      console.log(`\u{1F4C2} Using user settings migrations from: ${MIGRATIONS_PATH}`);
-      const appliedMigrations = getAppliedMigrations();
-      const files = fs_12.default.readdirSync(MIGRATIONS_PATH).filter((file) => file.endsWith(".sql")).sort();
-      const pendingMigrations = files.filter((file) => !appliedMigrations.includes(file));
-      if (pendingMigrations.length === 0) {
-        console.log("  \u2713 All migrations already applied");
-        return;
-      }
-      for (const file of pendingMigrations) {
-        const filePath = path_12.default.join(MIGRATIONS_PATH, file);
-        const sql = fs_12.default.readFileSync(filePath, "utf8");
-        try {
-          exports2.userSettingsDb.exec(sql);
-          recordMigration(file);
-          console.log(`  \u2713 Migration applied: ${file}`);
-        } catch (error) {
-          console.error(`  \u2717 Migration failed: ${file}`, error);
-          throw error;
-        }
-      }
-    }
-    function closeUserSettingsDb() {
-      if (exports2.userSettingsDb) {
-        exports2.userSettingsDb.close();
-        console.log("User Settings database connection closed");
-      }
-    }
-    function getUserSettingsDb() {
-      if (!exports2.userSettingsDb) {
-        throw new Error("User Settings database not initialized");
-      }
-      return exports2.userSettingsDb;
-    }
-  }
-});
-
 // backend/dist/models/Workflow.js
 var require_Workflow = __commonJS({
   "backend/dist/models/Workflow.js"(exports2) {
@@ -92132,7 +93516,7 @@ var require_customDropdownLists = __commonJS({
       }
     }));
     router.post("/scan-comfyui-models", (0, errorHandler_12.asyncHandler)(async (req, res) => {
-      const { modelFolders, sourcePath } = req.body;
+      const { modelFolders, sourcePath, mergeSubfolders, createBoth } = req.body;
       if (!modelFolders || !Array.isArray(modelFolders)) {
         return res.status(400).json({
           success: false,
@@ -92148,19 +93532,68 @@ var require_customDropdownLists = __commonJS({
           }
         }
         let createdCount = 0;
-        for (const folder of modelFolders) {
-          if (folder.files && folder.files.length > 0) {
-            try {
-              await CustomDropdownList_1.CustomDropdownListModel.create({
-                name: folder.displayName,
-                description: `ComfyUI ${folder.folderName} \uBAA8\uB378 \uBAA9\uB85D (\uC790\uB3D9 \uC218\uC9D1)`,
-                items: folder.files,
-                is_auto_collected: 1,
-                source_path: sourcePath || "client-selected"
-              });
-              createdCount++;
-            } catch (error) {
-              console.error(`Error creating list for ${folder.displayName}:`, error);
+        if (mergeSubfolders) {
+          const rootFolderMap = /* @__PURE__ */ new Map();
+          for (const folder of modelFolders) {
+            const rootFolder = folder.folderName;
+            if (!rootFolderMap.has(rootFolder)) {
+              rootFolderMap.set(rootFolder, []);
+            }
+            const subPath = folder.displayName.includes("/") ? folder.displayName.split("/").slice(1).join("/") + "/" : "";
+            for (const file of folder.files) {
+              const fullPath = file.includes("/") ? file : subPath + file;
+              rootFolderMap.get(rootFolder).push(fullPath);
+            }
+          }
+          for (const [rootFolder, files] of Array.from(rootFolderMap.entries())) {
+            if (files.length > 0) {
+              try {
+                await CustomDropdownList_1.CustomDropdownListModel.create({
+                  name: rootFolder,
+                  description: `ComfyUI ${rootFolder} \uD1B5\uD569 \uBAA8\uB378 \uBAA9\uB85D (\uC790\uB3D9 \uC218\uC9D1)`,
+                  items: files.sort(),
+                  is_auto_collected: 1,
+                  source_path: sourcePath || "client-selected"
+                });
+                createdCount++;
+              } catch (error) {
+                console.error(`Error creating merged list for ${rootFolder}:`, error);
+              }
+            }
+          }
+          if (createBoth) {
+            for (const folder of modelFolders) {
+              if (folder.displayName !== folder.folderName && folder.files && folder.files.length > 0) {
+                try {
+                  await CustomDropdownList_1.CustomDropdownListModel.create({
+                    name: folder.displayName,
+                    description: `ComfyUI ${folder.folderName} \uBAA8\uB378 \uBAA9\uB85D (\uC790\uB3D9 \uC218\uC9D1)`,
+                    items: folder.files,
+                    is_auto_collected: 1,
+                    source_path: sourcePath || "client-selected"
+                  });
+                  createdCount++;
+                } catch (error) {
+                  console.error(`Error creating list for ${folder.displayName}:`, error);
+                }
+              }
+            }
+          }
+        } else {
+          for (const folder of modelFolders) {
+            if (folder.files && folder.files.length > 0) {
+              try {
+                await CustomDropdownList_1.CustomDropdownListModel.create({
+                  name: folder.displayName,
+                  description: `ComfyUI ${folder.folderName} \uBAA8\uB378 \uBAA9\uB85D (\uC790\uB3D9 \uC218\uC9D1)`,
+                  items: folder.files,
+                  is_auto_collected: 1,
+                  source_path: sourcePath || "client-selected"
+                });
+                createdCount++;
+              } catch (error) {
+                console.error(`Error creating list for ${folder.displayName}:`, error);
+              }
             }
           }
         }
@@ -92170,6 +93603,7 @@ var require_customDropdownLists = __commonJS({
             scannedFolders: modelFolders.length,
             createdLists: createdCount,
             isRescan: deletedCount > 0,
+            mergeSubfolders: !!mergeSubfolders,
             message: deletedCount > 0 ? `${createdCount}\uAC1C \uBAA9\uB85D\uC774 \uC5C5\uB370\uC774\uD2B8\uB418\uC5C8\uC2B5\uB2C8\uB2E4.` : `${createdCount}\uAC1C \uBAA9\uB85D\uC774 \uC0DD\uC131\uB418\uC5C8\uC2B5\uB2C8\uB2E4.`
           }
         };
@@ -93461,15 +94895,15 @@ var require_Wildcard = __commonJS({
           let wildcardId;
           if (data.customId) {
             db.prepare(`
-          INSERT INTO wildcards (id, name, description)
-          VALUES (?, ?, ?)
-        `).run(data.customId, data.name, data.description || null);
+          INSERT INTO wildcards (id, name, description, parent_id, include_children)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(data.customId, data.name, data.description || null, data.parent_id ?? null, data.include_children ?? 0);
             wildcardId = data.customId;
           } else {
             const wildcardResult = db.prepare(`
-          INSERT INTO wildcards (name, description)
-          VALUES (?, ?)
-        `).run(data.name, data.description || null);
+          INSERT INTO wildcards (name, description, parent_id, include_children)
+          VALUES (?, ?, ?, ?)
+        `).run(data.name, data.description || null, data.parent_id ?? null, data.include_children ?? 0);
             wildcardId = wildcardResult.lastInsertRowid;
           }
           if (data.items.comfyui && data.items.comfyui.length > 0) {
@@ -93510,6 +94944,14 @@ var require_Wildcard = __commonJS({
             updates.push("description = ?");
             params.push(data.description);
           }
+          if (data.parent_id !== void 0) {
+            updates.push("parent_id = ?");
+            params.push(data.parent_id);
+          }
+          if (data.include_children !== void 0) {
+            updates.push("include_children = ?");
+            params.push(data.include_children);
+          }
           updates.push("updated_date = CURRENT_TIMESTAMP");
           params.push(id);
           if (updates.length > 0) {
@@ -93547,10 +94989,23 @@ var require_Wildcard = __commonJS({
         }
         return result;
       }
-      static delete(id) {
+      static delete(id, cascade = false) {
         const db = (0, userSettingsDb_12.getUserSettingsDb)();
-        const result = db.prepare("DELETE FROM wildcards WHERE id = ?").run(id);
-        return result.changes > 0;
+        if (cascade) {
+          const children = db.prepare("SELECT id FROM wildcards WHERE parent_id = ?").all(id);
+          for (const child of children) {
+            this.delete(child.id, true);
+          }
+          const result = db.prepare("DELETE FROM wildcards WHERE id = ?").run(id);
+          return result.changes > 0;
+        } else {
+          const wildcard = this.findById(id);
+          if (!wildcard)
+            return false;
+          db.prepare("UPDATE wildcards SET parent_id = ? WHERE parent_id = ?").run(wildcard.parent_id, id);
+          const result = db.prepare("DELETE FROM wildcards WHERE id = ?").run(id);
+          return result.changes > 0;
+        }
       }
       static findByIdWithItems(id) {
         const wildcard = _WildcardModel.findById(id);
@@ -93565,6 +95020,59 @@ var require_Wildcard = __commonJS({
           const items = WildcardItemModel.findByWildcardId(wildcard.id);
           return { ...wildcard, items };
         });
+      }
+      static findRoots() {
+        const db = (0, userSettingsDb_12.getUserSettingsDb)();
+        return db.prepare("SELECT * FROM wildcards WHERE parent_id IS NULL ORDER BY name").all();
+      }
+      static findByParentId(parentId) {
+        const db = (0, userSettingsDb_12.getUserSettingsDb)();
+        return db.prepare("SELECT * FROM wildcards WHERE parent_id = ? ORDER BY name").all(parentId);
+      }
+      static findHierarchy(parentId = null) {
+        const db = (0, userSettingsDb_12.getUserSettingsDb)();
+        const wildcards = parentId === null ? db.prepare("SELECT * FROM wildcards WHERE parent_id IS NULL ORDER BY name").all() : db.prepare("SELECT * FROM wildcards WHERE parent_id = ? ORDER BY name").all(parentId);
+        return wildcards.map((wildcard) => {
+          const items = WildcardItemModel.findByWildcardId(wildcard.id);
+          const children = _WildcardModel.findHierarchy(wildcard.id);
+          return { ...wildcard, items, children: children.length > 0 ? children : void 0 };
+        });
+      }
+      static getFullPath(wildcardId) {
+        const path = [];
+        let currentId = wildcardId;
+        while (currentId !== null) {
+          const wildcard = _WildcardModel.findById(currentId);
+          if (!wildcard)
+            break;
+          path.unshift(wildcard);
+          currentId = wildcard.parent_id;
+        }
+        return path;
+      }
+      static getAllDescendants(wildcardId) {
+        const descendants = [];
+        const directChildren = _WildcardModel.findByParentId(wildcardId);
+        for (const child of directChildren) {
+          descendants.push(child);
+          descendants.push(..._WildcardModel.getAllDescendants(child.id));
+        }
+        return descendants;
+      }
+      static checkCircularReference(wildcardId, targetParentId) {
+        if (wildcardId === targetParentId)
+          return true;
+        let currentId = targetParentId;
+        const visited = /* @__PURE__ */ new Set();
+        while (currentId !== null) {
+          if (visited.has(currentId) || currentId === wildcardId) {
+            return true;
+          }
+          visited.add(currentId);
+          const parent = _WildcardModel.findById(currentId);
+          currentId = parent?.parent_id ?? null;
+        }
+        return false;
       }
     };
     exports2.WildcardModel = WildcardModel;
@@ -93657,19 +95165,35 @@ var require_wildcardService = __commonJS({
           return `(${tag.trim()}:${randomValue})`;
         });
       }
+      static collectItemsWithChildren(wildcard, tool, wildcardMap, visited = /* @__PURE__ */ new Set()) {
+        if (visited.has(wildcard.id)) {
+          return [];
+        }
+        visited.add(wildcard.id);
+        const items = wildcard.items.filter((item) => item.tool === tool);
+        if (wildcard.include_children === 1) {
+          for (const [, wc] of wildcardMap) {
+            if (wc.parent_id === wildcard.id) {
+              const childItems = this.collectItemsWithChildren(wc, tool, wildcardMap, visited);
+              items.push(...childItems);
+            }
+          }
+        }
+        return items;
+      }
       static parseRecursive(text, wildcardMap, tool, visited) {
         const pattern = /\+\+([^+]+)\+\+/g;
         let result = text.replace(pattern, (match, name) => {
           if (visited.has(name)) {
             console.warn(`Circular reference detected for wildcard: ${name}`);
-            return match;
-          }
-          const wildcard = wildcardMap.get(name);
-          if (!wildcard || !wildcard.items || wildcard.items.length === 0) {
-            console.warn(`Wildcard not found or empty: ${name}`);
             return "";
           }
-          const toolItems = wildcard.items.filter((item) => item.tool === tool);
+          const wildcard = wildcardMap.get(name);
+          if (!wildcard) {
+            console.warn(`Wildcard not found: ${name}`);
+            return "";
+          }
+          const toolItems = this.collectItemsWithChildren(wildcard, tool, wildcardMap);
           if (toolItems.length === 0) {
             console.warn(`No items found for wildcard '${name}' with tool '${tool}'`);
             return "";
@@ -93818,7 +95342,18 @@ var require_wildcards = __commonJS({
     router.get("/", (0, errorHandler_12.asyncHandler)(async (req, res) => {
       try {
         const withItems = req.query.withItems !== "false";
-        const wildcards = withItems ? Wildcard_1.WildcardModel.findAllWithItems() : Wildcard_1.WildcardModel.findAll();
+        const hierarchical = req.query.hierarchical === "true";
+        const rootsOnly = req.query.rootsOnly === "true";
+        let wildcards;
+        if (hierarchical) {
+          wildcards = Wildcard_1.WildcardModel.findHierarchy(null);
+        } else if (rootsOnly) {
+          wildcards = Wildcard_1.WildcardModel.findRoots();
+        } else if (withItems) {
+          wildcards = Wildcard_1.WildcardModel.findAllWithItems();
+        } else {
+          wildcards = Wildcard_1.WildcardModel.findAll();
+        }
         return res.json({
           success: true,
           data: wildcards
@@ -93850,6 +95385,50 @@ var require_wildcards = __commonJS({
         return res.status(500).json({
           success: false,
           error: "Failed to get last scan log"
+        });
+      }
+    }));
+    router.get("/:id/children", (0, errorHandler_12.asyncHandler)(async (req, res) => {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid wildcard ID"
+        });
+      }
+      try {
+        const children = Wildcard_1.WildcardModel.findByParentId(id);
+        return res.json({
+          success: true,
+          data: children
+        });
+      } catch (error) {
+        console.error("Error getting wildcard children:", error);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to get wildcard children"
+        });
+      }
+    }));
+    router.get("/:id/path", (0, errorHandler_12.asyncHandler)(async (req, res) => {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid wildcard ID"
+        });
+      }
+      try {
+        const path = Wildcard_1.WildcardModel.getFullPath(id);
+        return res.json({
+          success: true,
+          data: path
+        });
+      } catch (error) {
+        console.error("Error getting wildcard path:", error);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to get wildcard path"
         });
       }
     }));
@@ -93911,6 +95490,15 @@ var require_wildcards = __commonJS({
             error: "Wildcard with this name already exists"
           });
         }
+        if (data.parent_id !== void 0 && data.parent_id !== null) {
+          const parentWildcard = Wildcard_1.WildcardModel.findById(data.parent_id);
+          if (!parentWildcard) {
+            return res.status(400).json({
+              success: false,
+              error: "Parent wildcard not found"
+            });
+          }
+        }
         const wildcard = Wildcard_1.WildcardModel.create(data);
         const wildcardWithItems = Wildcard_1.WildcardModel.findByIdWithItems(wildcard.id);
         const circularPath = wildcardService_1.WildcardService.detectCircularReference(wildcard.id);
@@ -93959,6 +95547,21 @@ var require_wildcards = __commonJS({
             });
           }
         }
+        if (data.parent_id !== void 0 && data.parent_id !== null) {
+          const parentWildcard = Wildcard_1.WildcardModel.findById(data.parent_id);
+          if (!parentWildcard) {
+            return res.status(400).json({
+              success: false,
+              error: "Parent wildcard not found"
+            });
+          }
+          if (Wildcard_1.WildcardModel.checkCircularReference(id, data.parent_id)) {
+            return res.status(400).json({
+              success: false,
+              error: "Circular parent reference detected"
+            });
+          }
+        }
         const wildcard = Wildcard_1.WildcardModel.update(id, data);
         const wildcardWithItems = Wildcard_1.WildcardModel.findByIdWithItems(wildcard.id);
         const circularPath = wildcardService_1.WildcardService.detectCircularReference(wildcard.id);
@@ -93983,6 +95586,7 @@ var require_wildcards = __commonJS({
     }));
     router.delete("/:id", (0, errorHandler_12.asyncHandler)(async (req, res) => {
       const id = parseInt(req.params.id);
+      const cascade = req.query.cascade === "true";
       if (isNaN(id)) {
         return res.status(400).json({
           success: false,
@@ -93990,7 +95594,7 @@ var require_wildcards = __commonJS({
         });
       }
       try {
-        const deleted = Wildcard_1.WildcardModel.delete(id);
+        const deleted = Wildcard_1.WildcardModel.delete(id, cascade);
         if (!deleted) {
           return res.status(404).json({
             success: false,
@@ -93999,7 +95603,7 @@ var require_wildcards = __commonJS({
         }
         return res.json({
           success: true,
-          message: "Wildcard deleted successfully"
+          message: cascade ? "Wildcard and all children deleted successfully" : "Wildcard deleted successfully"
         });
       } catch (error) {
         console.error("Error deleting wildcard:", error);
@@ -94150,6 +95754,7 @@ var require_wildcards = __commonJS({
         const createdWildcards = [];
         const usedNames = /* @__PURE__ */ new Set();
         const pathToWildcardName = /* @__PURE__ */ new Map();
+        const pathToWildcardId = /* @__PURE__ */ new Map();
         const levelCounters = /* @__PURE__ */ new Map();
         for (const folder of allFolders) {
           let wildcardName = folder.displayName;
@@ -94176,6 +95781,7 @@ var require_wildcards = __commonJS({
           }
           usedNames.add(wildcardName);
           pathToWildcardName.set(folder.folderName, wildcardName);
+          const parentPath = folder.pathParts.length > 1 ? folder.pathParts.slice(0, -1).join("/") : null;
           const currentCounter = (levelCounters.get(folder.level) || 0) + 1;
           levelCounters.set(folder.level, currentCounter);
           const customId = folder.level * 1e5 + currentCounter;
@@ -94193,40 +95799,40 @@ var require_wildcards = __commonJS({
                 items.push(loraTag);
               }
             }
-          } else {
-            const childFolders = allFolders.filter((f) => {
-              return f.pathParts.length === folder.pathParts.length + 1 && f.folderName.startsWith(folder.folderName + "/");
-            });
-            for (const child of childFolders) {
-              const childWildcardName = pathToWildcardName.get(child.folderName);
-              if (childWildcardName) {
-                items.push(`++${childWildcardName}++`);
-              }
-            }
           }
-          if (items.length > 0) {
-            const wildcardData = {
-              name: wildcardName,
-              description: `Auto-generated from ${folder.folderName}`,
-              items: {
-                comfyui: items,
-                nai: []
-              },
-              customId
-            };
-            const wildcard = Wildcard_1.WildcardModel.create(wildcardData);
-            db.prepare(`
-          UPDATE wildcards
-          SET is_auto_collected = 1, source_path = NULL, lora_weight = ?
-          WHERE id = ?
-        `).run(loraWeight, wildcard.id);
-            createdWildcards.push({
-              id: wildcard.id,
-              name: wildcardName,
-              itemCount: items.length,
-              folderName: folder.folderName,
-              level: folder.level
-            });
+          const wildcardData = {
+            name: wildcardName,
+            description: `Auto-generated from ${folder.folderName}`,
+            items: {
+              comfyui: items,
+              nai: []
+            },
+            customId,
+            parent_id: null,
+            include_children: 1
+          };
+          const wildcard = Wildcard_1.WildcardModel.create(wildcardData);
+          pathToWildcardId.set(folder.folderName, wildcard.id);
+          db.prepare(`
+        UPDATE wildcards
+        SET is_auto_collected = 1, source_path = NULL, lora_weight = ?
+        WHERE id = ?
+      `).run(loraWeight, wildcard.id);
+          createdWildcards.push({
+            id: wildcard.id,
+            name: wildcardName,
+            itemCount: items.length,
+            folderName: folder.folderName,
+            level: folder.level,
+            parentPath
+          });
+        }
+        for (const created of createdWildcards) {
+          if (created.parentPath) {
+            const parentId = pathToWildcardId.get(created.parentPath);
+            if (parentId) {
+              db.prepare("UPDATE wildcards SET parent_id = ? WHERE id = ?").run(parentId, created.id);
+            }
           }
         }
         db.prepare("DELETE FROM user_preferences WHERE key = ?").run("last_lora_scan_log");
@@ -95754,6 +97360,917 @@ var require_authMiddleware = __commonJS({
   }
 });
 
+// backend/dist/routes/externalApi.routes.js
+var require_externalApi_routes = __commonJS({
+  "backend/dist/routes/externalApi.routes.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    var express_12 = require_express2();
+    var ExternalApiProvider_1 = require_ExternalApiProvider();
+    var externalApiService_1 = require_externalApiService();
+    var asyncHandler_1 = require_asyncHandler();
+    var authMiddleware_12 = require_authMiddleware();
+    var router = (0, express_12.Router)();
+    router.use(authMiddleware_12.optionalAuth);
+    router.get("/providers", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const providers = ExternalApiProvider_1.ExternalApiProvider.findAll();
+      res.json({
+        success: true,
+        data: providers
+      });
+    }));
+    router.get("/providers/:name", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const { name } = req.params;
+      const provider = ExternalApiProvider_1.ExternalApiProvider.findByName(name);
+      if (!provider) {
+        res.status(404).json({
+          success: false,
+          error: "Provider not found"
+        });
+        return;
+      }
+      res.json({
+        success: true,
+        data: provider
+      });
+    }));
+    router.post("/providers", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const input = req.body;
+      if (!input.provider_name || !input.display_name) {
+        res.status(400).json({
+          success: false,
+          error: "provider_name and display_name are required"
+        });
+        return;
+      }
+      if (ExternalApiProvider_1.ExternalApiProvider.exists(input.provider_name)) {
+        res.status(409).json({
+          success: false,
+          error: "Provider with this name already exists"
+        });
+        return;
+      }
+      if (!/^[a-z0-9_-]+$/i.test(input.provider_name)) {
+        res.status(400).json({
+          success: false,
+          error: "provider_name can only contain letters, numbers, underscores, and hyphens"
+        });
+        return;
+      }
+      const providerId = ExternalApiProvider_1.ExternalApiProvider.create(input);
+      const provider = ExternalApiProvider_1.ExternalApiProvider.findByName(input.provider_name);
+      res.status(201).json({
+        success: true,
+        data: provider,
+        message: "Provider created successfully"
+      });
+    }));
+    router.put("/providers/:name", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const { name } = req.params;
+      const input = req.body;
+      if (!ExternalApiProvider_1.ExternalApiProvider.exists(name)) {
+        res.status(404).json({
+          success: false,
+          error: "Provider not found"
+        });
+        return;
+      }
+      const updated = ExternalApiProvider_1.ExternalApiProvider.update(name, input);
+      if (!updated) {
+        res.status(400).json({
+          success: false,
+          error: "No changes made"
+        });
+        return;
+      }
+      const provider = ExternalApiProvider_1.ExternalApiProvider.findByName(name);
+      res.json({
+        success: true,
+        data: provider,
+        message: "Provider updated successfully"
+      });
+    }));
+    router.delete("/providers/:name", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const { name } = req.params;
+      const deleted = ExternalApiProvider_1.ExternalApiProvider.delete(name);
+      if (!deleted) {
+        res.status(404).json({
+          success: false,
+          error: "Provider not found"
+        });
+        return;
+      }
+      res.json({
+        success: true,
+        message: "Provider deleted successfully"
+      });
+    }));
+    router.patch("/providers/:name/toggle", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const { name } = req.params;
+      const { is_enabled } = req.body;
+      if (typeof is_enabled !== "boolean") {
+        res.status(400).json({
+          success: false,
+          error: "is_enabled must be a boolean"
+        });
+        return;
+      }
+      if (is_enabled) {
+        const apiKey = ExternalApiProvider_1.ExternalApiProvider.getDecryptedKey(name);
+        if (!apiKey) {
+          res.status(400).json({
+            success: false,
+            error: "Cannot enable provider without API key. Please add an API key first."
+          });
+          return;
+        }
+      }
+      const updated = ExternalApiProvider_1.ExternalApiProvider.toggleEnabled(name, is_enabled);
+      if (!updated) {
+        res.status(404).json({
+          success: false,
+          error: "Provider not found"
+        });
+        return;
+      }
+      const provider = ExternalApiProvider_1.ExternalApiProvider.findByName(name);
+      res.json({
+        success: true,
+        data: provider,
+        message: `Provider ${is_enabled ? "enabled" : "disabled"} successfully`
+      });
+    }));
+    router.post("/providers/:name/test", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const { name } = req.params;
+      const apiKey = ExternalApiProvider_1.ExternalApiProvider.getDecryptedKey(name);
+      if (!apiKey) {
+        res.status(400).json({
+          success: false,
+          error: "API key not configured or provider is disabled"
+        });
+        return;
+      }
+      const success = await externalApiService_1.ExternalApiService.testConnection(name, apiKey);
+      res.json({
+        success,
+        message: success ? "Connection test successful" : "Connection test failed - please check your API key"
+      });
+    }));
+    exports2.default = router;
+  }
+});
+
+// backend/dist/models/CivitaiTempUrl.js
+var require_CivitaiTempUrl = __commonJS({
+  "backend/dist/models/CivitaiTempUrl.js"(exports2) {
+    "use strict";
+    var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
+      return mod && mod.__esModule ? mod : { "default": mod };
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.CivitaiTempUrl = void 0;
+    var init_12 = require_init2();
+    var crypto_12 = __importDefault2(require("crypto"));
+    var CivitaiTempUrl = class {
+      static findByToken(token) {
+        const row = init_12.db.prepare(`
+      SELECT * FROM civitai_temp_urls WHERE token = ?
+    `).get(token);
+        return row || null;
+      }
+      static findValidByToken(token) {
+        const row = init_12.db.prepare(`
+      SELECT * FROM civitai_temp_urls
+      WHERE token = ? AND expires_at > datetime('now')
+    `).get(token);
+        return row || null;
+      }
+      static create(input) {
+        const token = crypto_12.default.randomBytes(32).toString("hex");
+        const expiresInMinutes = input.expiresInMinutes || this.DEFAULT_EXPIRY_MINUTES;
+        init_12.db.prepare(`
+      INSERT INTO civitai_temp_urls (
+        token, composite_hash, include_metadata, expires_at
+      ) VALUES (?, ?, ?, datetime('now', '+' || ? || ' minutes'))
+    `).run(token, input.composite_hash, input.include_metadata !== false ? 1 : 0, expiresInMinutes);
+        return token;
+      }
+      static createMany(compositeHashes, includeMetadata = true, expiresInMinutes = 60) {
+        const tokens = [];
+        const stmt = init_12.db.prepare(`
+      INSERT INTO civitai_temp_urls (
+        token, composite_hash, include_metadata, expires_at
+      ) VALUES (?, ?, ?, datetime('now', '+' || ? || ' minutes'))
+    `);
+        const insertMany = init_12.db.transaction((hashes) => {
+          for (const hash of hashes) {
+            const token = crypto_12.default.randomBytes(32).toString("hex");
+            stmt.run(token, hash, includeMetadata ? 1 : 0, expiresInMinutes);
+            tokens.push(token);
+          }
+        });
+        insertMany(compositeHashes);
+        return tokens;
+      }
+      static incrementAccessCount(token) {
+        init_12.db.prepare(`
+      UPDATE civitai_temp_urls
+      SET access_count = access_count + 1
+      WHERE token = ?
+    `).run(token);
+      }
+      static cleanupExpired() {
+        const result = init_12.db.prepare(`
+      DELETE FROM civitai_temp_urls WHERE expires_at <= datetime('now')
+    `).run();
+        return result.changes;
+      }
+      static delete(token) {
+        const result = init_12.db.prepare(`DELETE FROM civitai_temp_urls WHERE token = ?`).run(token);
+        return result.changes > 0;
+      }
+      static clearAll() {
+        const result = init_12.db.prepare(`DELETE FROM civitai_temp_urls`).run();
+        return result.changes;
+      }
+    };
+    exports2.CivitaiTempUrl = CivitaiTempUrl;
+    CivitaiTempUrl.DEFAULT_EXPIRY_MINUTES = 60;
+  }
+});
+
+// backend/dist/services/civitaiTempUrlService.js
+var require_civitaiTempUrlService = __commonJS({
+  "backend/dist/services/civitaiTempUrlService.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.CivitaiTempUrlService = void 0;
+    var CivitaiTempUrl_1 = require_CivitaiTempUrl();
+    var CIVITAI_POST_INTENT_BASE = "https://civitai.com/intent/post";
+    var CivitaiTempUrlService = class {
+      static createIntentUrl(baseUrl, params) {
+        const tokens = CivitaiTempUrl_1.CivitaiTempUrl.createMany(params.compositeHashes, params.includeMetadata !== false, 60);
+        const mediaUrls = tokens.map((token) => `${baseUrl}/api/civitai/temp-image/${token}`);
+        const query = new URLSearchParams();
+        mediaUrls.forEach((url) => query.append("mediaUrl", url));
+        if (params.title) {
+          query.append("title", params.title);
+        }
+        if (params.description) {
+          query.append("description", params.description);
+        }
+        if (params.tags && params.tags.length > 0) {
+          query.append("tags", params.tags.join(","));
+        }
+        if (params.detailsUrl) {
+          query.append("detailsUrl", params.detailsUrl);
+        }
+        const intentUrl = `${CIVITAI_POST_INTENT_BASE}?${query.toString()}`;
+        const expiresAt = /* @__PURE__ */ new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + 60);
+        return {
+          intentUrl,
+          tokens,
+          expiresAt
+        };
+      }
+      static cleanup() {
+        return CivitaiTempUrl_1.CivitaiTempUrl.cleanupExpired();
+      }
+    };
+    exports2.CivitaiTempUrlService = CivitaiTempUrlService;
+  }
+});
+
+// backend/dist/routes/civitai.routes.js
+var require_civitai_routes = __commonJS({
+  "backend/dist/routes/civitai.routes.js"(exports2) {
+    "use strict";
+    var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
+      return mod && mod.__esModule ? mod : { "default": mod };
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    var express_12 = require_express2();
+    var path_12 = __importDefault2(require("path"));
+    var fs_12 = __importDefault2(require("fs"));
+    var asyncHandler_1 = require_asyncHandler();
+    var authMiddleware_12 = require_authMiddleware();
+    var CivitaiSettings_1 = require_CivitaiSettings();
+    var ModelInfo_1 = require_ModelInfo();
+    var ImageModel_1 = require_ImageModel();
+    var CivitaiTempUrl_1 = require_CivitaiTempUrl();
+    var civitaiService_1 = require_civitaiService();
+    var civitaiTempUrlService_1 = require_civitaiTempUrlService();
+    var init_12 = require_init2();
+    var router = (0, express_12.Router)();
+    router.use(authMiddleware_12.optionalAuth);
+    router.get("/settings", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const settings = CivitaiSettings_1.CivitaiSettings.get();
+      res.json({
+        success: true,
+        data: settings
+      });
+    }));
+    router.put("/settings", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const { enabled, apiCallInterval } = req.body;
+      const updated = CivitaiSettings_1.CivitaiSettings.update({
+        enabled,
+        apiCallInterval
+      });
+      const settings = CivitaiSettings_1.CivitaiSettings.get();
+      res.json({
+        success: true,
+        data: settings
+      });
+    }));
+    router.get("/stats", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const settings = CivitaiSettings_1.CivitaiSettings.get();
+      res.json({
+        success: true,
+        data: {
+          totalLookups: settings.totalLookups,
+          successfulLookups: settings.successfulLookups,
+          failedLookups: settings.failedLookups,
+          lastApiCall: settings.lastApiCall,
+          successRate: settings.totalLookups > 0 ? Math.round(settings.successfulLookups / settings.totalLookups * 100) : 0
+        }
+      });
+    }));
+    router.post("/stats/reset", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      CivitaiSettings_1.CivitaiSettings.resetStats();
+      res.json({
+        success: true,
+        message: "Statistics reset"
+      });
+    }));
+    router.get("/models", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const limit = parseInt(req.query.limit) || 100;
+      const offset = parseInt(req.query.offset) || 0;
+      const models = ModelInfo_1.ModelInfo.findAll(limit, offset);
+      res.json({
+        success: true,
+        data: models
+      });
+    }));
+    router.get("/models/:hash", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const { hash } = req.params;
+      const model = ModelInfo_1.ModelInfo.findByHash(hash);
+      if (!model) {
+        res.status(404).json({
+          success: false,
+          error: "Model not found in cache"
+        });
+        return;
+      }
+      res.json({
+        success: true,
+        data: model
+      });
+    }));
+    router.get("/images/:compositeHash/models", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const { compositeHash } = req.params;
+      const imageModels = ImageModel_1.ImageModel.findByCompositeHash(compositeHash);
+      const enriched = imageModels.map((im) => {
+        const modelInfo = ModelInfo_1.ModelInfo.findByHash(im.model_hash);
+        return {
+          ...im,
+          modelInfo: modelInfo || null
+        };
+      });
+      res.json({
+        success: true,
+        data: enriched
+      });
+    }));
+    router.post("/lookup/:hash", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const { hash } = req.params;
+      const settings = CivitaiSettings_1.CivitaiSettings.get();
+      if (!settings.enabled) {
+        res.status(400).json({
+          success: false,
+          error: "Civitai integration is disabled. Please enable it in settings.",
+          code: "CIVITAI_DISABLED"
+        });
+        return;
+      }
+      const success = await civitaiService_1.CivitaiService.lookupAndCacheModel(hash);
+      if (success) {
+        const model = ModelInfo_1.ModelInfo.findByHash(hash);
+        res.json({
+          success: true,
+          data: model
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          error: "Model not found on Civitai"
+        });
+      }
+    }));
+    router.post("/reset-failed", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const count = ImageModel_1.ImageModel.resetFailed();
+      res.json({
+        success: true,
+        message: `Reset ${count} failed lookups`
+      });
+    }));
+    router.delete("/models", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const count = ModelInfo_1.ModelInfo.clearAll();
+      res.json({
+        success: true,
+        message: `Cleared ${count} cached models`
+      });
+    }));
+    router.post("/create-intent", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const { compositeHashes, includeMetadata, title, description, tags } = req.body;
+      if (!compositeHashes || !Array.isArray(compositeHashes) || compositeHashes.length === 0) {
+        res.status(400).json({
+          success: false,
+          error: "compositeHashes array is required"
+        });
+        return;
+      }
+      if (compositeHashes.length > 20) {
+        res.status(400).json({
+          success: false,
+          error: "Maximum 20 images allowed per post"
+        });
+        return;
+      }
+      const protocol = req.protocol;
+      const host = req.get("host");
+      const baseUrl = `${protocol}://${host}`;
+      const result = civitaiTempUrlService_1.CivitaiTempUrlService.createIntentUrl(baseUrl, {
+        compositeHashes,
+        includeMetadata,
+        title,
+        description,
+        tags
+      });
+      res.json({
+        success: true,
+        data: result
+      });
+    }));
+    router.get("/temp-image/:token", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const { token } = req.params;
+      const tempUrl = CivitaiTempUrl_1.CivitaiTempUrl.findValidByToken(token);
+      if (!tempUrl) {
+        res.status(404).json({
+          success: false,
+          error: "Image not found or expired"
+        });
+        return;
+      }
+      CivitaiTempUrl_1.CivitaiTempUrl.incrementAccessCount(token);
+      const imageData = init_12.db.prepare(`
+    SELECT if.original_file_path
+    FROM image_files if
+    WHERE if.composite_hash = ?
+      AND if.file_status = 'active'
+    ORDER BY if.last_verified_date DESC
+    LIMIT 1
+  `).get(tempUrl.composite_hash);
+      if (!imageData || !imageData.original_file_path) {
+        res.status(404).json({
+          success: false,
+          error: "Image file not found"
+        });
+        return;
+      }
+      const imagePath = imageData.original_file_path;
+      if (!fs_12.default.existsSync(imagePath)) {
+        res.status(404).json({
+          success: false,
+          error: "Image file not found on disk"
+        });
+        return;
+      }
+      const ext = path_12.default.extname(imagePath).toLowerCase();
+      const contentTypes = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".gif": "image/gif"
+      };
+      const contentType = contentTypes[ext] || "application/octet-stream";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.sendFile(imagePath);
+    }));
+    router.post("/cleanup-temp-urls", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const count = CivitaiTempUrl_1.CivitaiTempUrl.cleanupExpired();
+      res.json({
+        success: true,
+        message: `Cleaned up ${count} expired URLs`
+      });
+    }));
+    var rescanProgress = {
+      isRunning: false,
+      total: 0,
+      processed: 0,
+      added: 0,
+      startedAt: null
+    };
+    router.post("/rescan-all", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const settings = CivitaiSettings_1.CivitaiSettings.get();
+      if (!settings.enabled) {
+        res.status(400).json({
+          success: false,
+          error: "Civitai integration is disabled. Please enable it in settings.",
+          code: "CIVITAI_DISABLED"
+        });
+        return;
+      }
+      if (rescanProgress.isRunning) {
+        res.status(409).json({
+          success: false,
+          error: "Rescan is already in progress",
+          code: "RESCAN_IN_PROGRESS",
+          progress: rescanProgress
+        });
+        return;
+      }
+      const imagesWithRefs = init_12.db.prepare(`
+    SELECT composite_hash, model_references
+    FROM media_metadata
+    WHERE model_references IS NOT NULL AND model_references != '[]'
+  `).all();
+      if (imagesWithRefs.length === 0) {
+        res.json({
+          success: true,
+          message: "No images with model references found",
+          total: 0,
+          added: 0
+        });
+        return;
+      }
+      rescanProgress = {
+        isRunning: true,
+        total: imagesWithRefs.length,
+        processed: 0,
+        added: 0,
+        startedAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      (async () => {
+        let addedCount = 0;
+        for (const image of imagesWithRefs) {
+          try {
+            const modelRefs = JSON.parse(image.model_references);
+            for (const ref of modelRefs) {
+              if (!ref.hash)
+                continue;
+              const existing = init_12.db.prepare(`
+            SELECT 1 FROM image_models
+            WHERE composite_hash = ? AND model_hash = ? AND model_role = ?
+            LIMIT 1
+          `).get(image.composite_hash, ref.hash, ref.type);
+              if (!existing) {
+                ImageModel_1.ImageModel.create({
+                  composite_hash: image.composite_hash,
+                  model_hash: ref.hash,
+                  model_role: ref.type,
+                  weight: ref.weight
+                });
+                addedCount++;
+              }
+            }
+          } catch (err) {
+            console.warn(`\uC7AC\uC2A4\uCE94 \uC911 \uC624\uB958 (${image.composite_hash}):`, err);
+          }
+          rescanProgress.processed++;
+          rescanProgress.added = addedCount;
+        }
+        rescanProgress.isRunning = false;
+        console.log(`\u2705 Civitai \uC7AC\uC2A4\uCE94 \uC644\uB8CC: ${addedCount}\uAC1C \uBAA8\uB378 \uCC38\uC870 \uCD94\uAC00`);
+      })();
+      res.json({
+        success: true,
+        message: "Rescan started",
+        total: imagesWithRefs.length
+      });
+    }));
+    router.get("/rescan-progress", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      res.json({
+        success: true,
+        data: {
+          ...rescanProgress,
+          percentage: rescanProgress.total > 0 ? Math.round(rescanProgress.processed / rescanProgress.total * 100) : 0
+        }
+      });
+    }));
+    router.get("/unchecked-count", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const result = init_12.db.prepare(`
+    SELECT COUNT(*) as count
+    FROM image_models
+    WHERE civitai_checked = 0 AND civitai_failed = 0
+  `).get();
+      res.json({
+        success: true,
+        data: {
+          uncheckedCount: result.count
+        }
+      });
+    }));
+    exports2.default = router;
+  }
+});
+
+// backend/dist/i18n/locales/en.json
+var require_en = __commonJS({
+  "backend/dist/i18n/locales/en.json"(exports2, module2) {
+    module2.exports = {
+      server: {
+        starting: "ComfyUI Image Manager Backend starting...",
+        started: "ComfyUI Image Manager - Server Running!",
+        access_urls: "Access URLs:",
+        local: "Local",
+        network: "Network",
+        external: "External (requires port forwarding)",
+        data_root: "Data Root",
+        uploads: "Uploads",
+        tips: {
+          local_access: "Access from this computer",
+          network_access: "Access from local network: Use any of the network URLs above",
+          external_access: "For external access: Configure port forwarding on your router",
+          stop_server: "Press Ctrl+C to stop the server"
+        }
+      },
+      database: {
+        initialized: "Database initialized successfully"
+      },
+      errors: {
+        port_in_use: "Port {port} is already in use",
+        database_error: "Database error",
+        frontend_not_found: "Frontend not found. Please build the frontend first.",
+        invalid_image: "Invalid image file",
+        group_not_found: "Group not found",
+        image_not_found: "Image not found"
+      },
+      api: {
+        image_uploaded: "Image uploaded successfully",
+        image_deleted: "Image deleted successfully",
+        group_created: "Group created successfully",
+        group_updated: "Group updated successfully",
+        group_deleted: "Group deleted successfully"
+      }
+    };
+  }
+});
+
+// backend/dist/i18n/locales/ko.json
+var require_ko = __commonJS({
+  "backend/dist/i18n/locales/ko.json"(exports2, module2) {
+    module2.exports = {
+      server: {
+        starting: "ComfyUI Image Manager \uBC31\uC5D4\uB4DC \uC2DC\uC791 \uC911...",
+        started: "ComfyUI Image Manager - \uC11C\uBC84 \uC2E4\uD589 \uC911!",
+        access_urls: "\uC811\uC18D URL:",
+        local: "\uB85C\uCEEC",
+        network: "\uB124\uD2B8\uC6CC\uD06C",
+        external: "\uC678\uBD80 (\uD3EC\uD2B8 \uD3EC\uC6CC\uB529 \uD544\uC694)",
+        data_root: "\uB370\uC774\uD130 \uB8E8\uD2B8",
+        uploads: "\uC5C5\uB85C\uB4DC",
+        tips: {
+          local_access: "\uC774 \uCEF4\uD4E8\uD130\uC5D0\uC11C \uC811\uC18D",
+          network_access: "\uB85C\uCEEC \uB124\uD2B8\uC6CC\uD06C\uC5D0\uC11C \uC811\uC18D: \uC704\uC758 \uB124\uD2B8\uC6CC\uD06C URL \uC911 \uD558\uB098\uB97C \uC0AC\uC6A9\uD558\uC138\uC694",
+          external_access: "\uC678\uBD80 \uC811\uC18D: \uACF5\uC720\uAE30\uC5D0\uC11C \uD3EC\uD2B8 \uD3EC\uC6CC\uB529\uC744 \uC124\uC815\uD558\uC138\uC694",
+          stop_server: "Ctrl+C\uB97C \uB20C\uB7EC \uC11C\uBC84\uB97C \uC911\uC9C0\uD569\uB2C8\uB2E4"
+        }
+      },
+      database: {
+        initialized: "\uB370\uC774\uD130\uBCA0\uC774\uC2A4 \uCD08\uAE30\uD654 \uC644\uB8CC"
+      },
+      errors: {
+        port_in_use: "\uD3EC\uD2B8 {port}\uAC00 \uC774\uBBF8 \uC0AC\uC6A9 \uC911\uC785\uB2C8\uB2E4",
+        database_error: "\uB370\uC774\uD130\uBCA0\uC774\uC2A4 \uC624\uB958",
+        frontend_not_found: "\uD504\uB860\uD2B8\uC5D4\uB4DC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uBA3C\uC800 \uD504\uB860\uD2B8\uC5D4\uB4DC\uB97C \uBE4C\uB4DC\uD574\uC8FC\uC138\uC694.",
+        invalid_image: "\uC798\uBABB\uB41C \uC774\uBBF8\uC9C0 \uD30C\uC77C\uC785\uB2C8\uB2E4",
+        group_not_found: "\uADF8\uB8F9\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4",
+        image_not_found: "\uC774\uBBF8\uC9C0\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4"
+      },
+      api: {
+        image_uploaded: "\uC774\uBBF8\uC9C0 \uC5C5\uB85C\uB4DC \uC644\uB8CC",
+        image_deleted: "\uC774\uBBF8\uC9C0 \uC0AD\uC81C \uC644\uB8CC",
+        group_created: "\uADF8\uB8F9 \uC0DD\uC131 \uC644\uB8CC",
+        group_updated: "\uADF8\uB8F9 \uC5C5\uB370\uC774\uD2B8 \uC644\uB8CC",
+        group_deleted: "\uADF8\uB8F9 \uC0AD\uC81C \uC644\uB8CC"
+      }
+    };
+  }
+});
+
+// backend/dist/i18n/locales/ja.json
+var require_ja = __commonJS({
+  "backend/dist/i18n/locales/ja.json"(exports2, module2) {
+    module2.exports = {
+      server: {
+        starting: "ComfyUI Image Manager \u30D0\u30C3\u30AF\u30A8\u30F3\u30C9\u3092\u8D77\u52D5\u4E2D...",
+        started: "ComfyUI Image Manager - \u30B5\u30FC\u30D0\u30FC\u5B9F\u884C\u4E2D\uFF01",
+        access_urls: "\u30A2\u30AF\u30BB\u30B9URL:",
+        local: "\u30ED\u30FC\u30AB\u30EB",
+        network: "\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF",
+        external: "\u5916\u90E8 (\u30DD\u30FC\u30C8\u30D5\u30A9\u30EF\u30FC\u30C7\u30A3\u30F3\u30B0\u304C\u5FC5\u8981)",
+        data_root: "\u30C7\u30FC\u30BF\u30EB\u30FC\u30C8",
+        uploads: "\u30A2\u30C3\u30D7\u30ED\u30FC\u30C9",
+        tips: {
+          local_access: "\u3053\u306E\u30B3\u30F3\u30D4\u30E5\u30FC\u30BF\u304B\u3089\u30A2\u30AF\u30BB\u30B9",
+          network_access: "\u30ED\u30FC\u30AB\u30EB\u30CD\u30C3\u30C8\u30EF\u30FC\u30AF\u304B\u3089\u30A2\u30AF\u30BB\u30B9: \u4E0A\u8A18\u306E\u30CD\u30C3\u30C8\u30EF\u30FC\u30AFURL\u306E\u3044\u305A\u308C\u304B\u3092\u4F7F\u7528\u3057\u3066\u304F\u3060\u3055\u3044",
+          external_access: "\u5916\u90E8\u30A2\u30AF\u30BB\u30B9: \u30EB\u30FC\u30BF\u30FC\u3067\u30DD\u30FC\u30C8\u30D5\u30A9\u30EF\u30FC\u30C7\u30A3\u30F3\u30B0\u3092\u8A2D\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044",
+          stop_server: "Ctrl+C\u3092\u62BC\u3057\u3066\u30B5\u30FC\u30D0\u30FC\u3092\u505C\u6B62\u3057\u307E\u3059"
+        }
+      },
+      database: {
+        initialized: "\u30C7\u30FC\u30BF\u30D9\u30FC\u30B9\u306E\u521D\u671F\u5316\u306B\u6210\u529F\u3057\u307E\u3057\u305F"
+      },
+      errors: {
+        port_in_use: "\u30DD\u30FC\u30C8{port}\u306F\u65E2\u306B\u4F7F\u7528\u3055\u308C\u3066\u3044\u307E\u3059",
+        database_error: "\u30C7\u30FC\u30BF\u30D9\u30FC\u30B9\u30A8\u30E9\u30FC",
+        frontend_not_found: "\u30D5\u30ED\u30F3\u30C8\u30A8\u30F3\u30C9\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002\u6700\u521D\u306B\u30D5\u30ED\u30F3\u30C8\u30A8\u30F3\u30C9\u3092\u30D3\u30EB\u30C9\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+        invalid_image: "\u7121\u52B9\u306A\u753B\u50CF\u30D5\u30A1\u30A4\u30EB\u3067\u3059",
+        group_not_found: "\u30B0\u30EB\u30FC\u30D7\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093",
+        image_not_found: "\u753B\u50CF\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093"
+      },
+      api: {
+        image_uploaded: "\u753B\u50CF\u306E\u30A2\u30C3\u30D7\u30ED\u30FC\u30C9\u306B\u6210\u529F\u3057\u307E\u3057\u305F",
+        image_deleted: "\u753B\u50CF\u3092\u524A\u9664\u3057\u307E\u3057\u305F",
+        group_created: "\u30B0\u30EB\u30FC\u30D7\u3092\u4F5C\u6210\u3057\u307E\u3057\u305F",
+        group_updated: "\u30B0\u30EB\u30FC\u30D7\u3092\u66F4\u65B0\u3057\u307E\u3057\u305F",
+        group_deleted: "\u30B0\u30EB\u30FC\u30D7\u3092\u524A\u9664\u3057\u307E\u3057\u305F"
+      }
+    };
+  }
+});
+
+// backend/dist/i18n/locales/zh-CN.json
+var require_zh_CN = __commonJS({
+  "backend/dist/i18n/locales/zh-CN.json"(exports2, module2) {
+    module2.exports = {
+      server: {
+        starting: "ComfyUI Image Manager \u540E\u7AEF\u542F\u52A8\u4E2D...",
+        started: "ComfyUI Image Manager - \u670D\u52A1\u5668\u8FD0\u884C\u4E2D\uFF01",
+        access_urls: "\u8BBF\u95EEURL:",
+        local: "\u672C\u5730",
+        network: "\u7F51\u7EDC",
+        external: "\u5916\u90E8\uFF08\u9700\u8981\u7AEF\u53E3\u8F6C\u53D1\uFF09",
+        data_root: "\u6570\u636E\u6839\u76EE\u5F55",
+        uploads: "\u4E0A\u4F20",
+        tips: {
+          local_access: "\u4ECE\u6B64\u8BA1\u7B97\u673A\u8BBF\u95EE",
+          network_access: "\u4ECE\u5C40\u57DF\u7F51\u8BBF\u95EE\uFF1A\u4F7F\u7528\u4E0A\u9762\u7684\u4EFB\u4E00\u7F51\u7EDCURL",
+          external_access: "\u5916\u90E8\u8BBF\u95EE\uFF1A\u5728\u8DEF\u7531\u5668\u4E0A\u914D\u7F6E\u7AEF\u53E3\u8F6C\u53D1",
+          stop_server: "\u6309Ctrl+C\u505C\u6B62\u670D\u52A1\u5668"
+        }
+      },
+      database: {
+        initialized: "\u6570\u636E\u5E93\u521D\u59CB\u5316\u6210\u529F"
+      },
+      errors: {
+        port_in_use: "\u7AEF\u53E3{port}\u5DF2\u88AB\u5360\u7528",
+        database_error: "\u6570\u636E\u5E93\u9519\u8BEF",
+        frontend_not_found: "\u672A\u627E\u5230\u524D\u7AEF\u3002\u8BF7\u5148\u6784\u5EFA\u524D\u7AEF\u3002",
+        invalid_image: "\u65E0\u6548\u7684\u56FE\u50CF\u6587\u4EF6",
+        group_not_found: "\u672A\u627E\u5230\u7EC4",
+        image_not_found: "\u672A\u627E\u5230\u56FE\u50CF"
+      },
+      api: {
+        image_uploaded: "\u56FE\u50CF\u4E0A\u4F20\u6210\u529F",
+        image_deleted: "\u56FE\u50CF\u5DF2\u5220\u9664",
+        group_created: "\u7EC4\u5DF2\u521B\u5EFA",
+        group_updated: "\u7EC4\u5DF2\u66F4\u65B0",
+        group_deleted: "\u7EC4\u5DF2\u5220\u9664"
+      }
+    };
+  }
+});
+
+// backend/dist/i18n/locales/zh-TW.json
+var require_zh_TW = __commonJS({
+  "backend/dist/i18n/locales/zh-TW.json"(exports2, module2) {
+    module2.exports = {
+      server: {
+        starting: "ComfyUI Image Manager \u5F8C\u7AEF\u555F\u52D5\u4E2D...",
+        started: "ComfyUI Image Manager - \u4F3A\u670D\u5668\u57F7\u884C\u4E2D\uFF01",
+        access_urls: "\u5B58\u53D6URL:",
+        local: "\u672C\u6A5F",
+        network: "\u7DB2\u8DEF",
+        external: "\u5916\u90E8\uFF08\u9700\u8981\u9023\u63A5\u57E0\u8F49\u9001\uFF09",
+        data_root: "\u8CC7\u6599\u6839\u76EE\u9304",
+        uploads: "\u4E0A\u50B3",
+        tips: {
+          local_access: "\u5F9E\u6B64\u96FB\u8166\u5B58\u53D6",
+          network_access: "\u5F9E\u5340\u57DF\u7DB2\u8DEF\u5B58\u53D6\uFF1A\u4F7F\u7528\u4E0A\u65B9\u7684\u4EFB\u4E00\u7DB2\u8DEFURL",
+          external_access: "\u5916\u90E8\u5B58\u53D6\uFF1A\u5728\u8DEF\u7531\u5668\u4E0A\u8A2D\u5B9A\u9023\u63A5\u57E0\u8F49\u9001",
+          stop_server: "\u6309Ctrl+C\u505C\u6B62\u4F3A\u670D\u5668"
+        }
+      },
+      database: {
+        initialized: "\u8CC7\u6599\u5EAB\u521D\u59CB\u5316\u6210\u529F"
+      },
+      errors: {
+        port_in_use: "\u9023\u63A5\u57E0{port}\u5DF2\u88AB\u4F7F\u7528",
+        database_error: "\u8CC7\u6599\u5EAB\u932F\u8AA4",
+        frontend_not_found: "\u627E\u4E0D\u5230\u524D\u7AEF\u3002\u8ACB\u5148\u5EFA\u7F6E\u524D\u7AEF\u3002",
+        invalid_image: "\u7121\u6548\u7684\u5716\u50CF\u6A94\u6848",
+        group_not_found: "\u627E\u4E0D\u5230\u7FA4\u7D44",
+        image_not_found: "\u627E\u4E0D\u5230\u5716\u50CF"
+      },
+      api: {
+        image_uploaded: "\u5716\u50CF\u4E0A\u50B3\u6210\u529F",
+        image_deleted: "\u5716\u50CF\u5DF2\u522A\u9664",
+        group_created: "\u7FA4\u7D44\u5DF2\u5EFA\u7ACB",
+        group_updated: "\u7FA4\u7D44\u5DF2\u66F4\u65B0",
+        group_deleted: "\u7FA4\u7D44\u5DF2\u522A\u9664"
+      }
+    };
+  }
+});
+
+// backend/dist/i18n/index.js
+var require_i18n = __commonJS({
+  "backend/dist/i18n/index.js"(exports2) {
+    "use strict";
+    var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
+      return mod && mod.__esModule ? mod : { "default": mod };
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.initI18n = initI18n;
+    exports2.t = t;
+    exports2.getCurrentLocale = getCurrentLocale;
+    exports2.setLocale = setLocale;
+    exports2.getAvailableLocales = getAvailableLocales;
+    var en_json_1 = __importDefault2(require_en());
+    var ko_json_1 = __importDefault2(require_ko());
+    var ja_json_1 = __importDefault2(require_ja());
+    var zh_CN_json_1 = __importDefault2(require_zh_CN());
+    var zh_TW_json_1 = __importDefault2(require_zh_TW());
+    var translations = {
+      en: en_json_1.default,
+      ko: ko_json_1.default,
+      ja: ja_json_1.default,
+      "zh-CN": zh_CN_json_1.default,
+      "zh-TW": zh_TW_json_1.default
+    };
+    var currentLocale = "en";
+    function initI18n() {
+      const envLocale = process.env.LOCALE?.toLowerCase();
+      if (envLocale && isValidLocale(envLocale)) {
+        currentLocale = envLocale;
+      } else {
+        const systemLocale = Intl.DateTimeFormat().resolvedOptions().locale;
+        const language = systemLocale.split("-")[0];
+        if (isValidLocale(language)) {
+          currentLocale = language;
+        }
+      }
+      console.log(`\u{1F310} Locale: ${currentLocale}`);
+    }
+    function isValidLocale(locale) {
+      return ["en", "ko", "ja", "zh-CN", "zh-TW"].includes(locale);
+    }
+    function t(keyPath, params) {
+      const keys = keyPath.split(".");
+      let value = translations[currentLocale];
+      for (const key of keys) {
+        if (value && typeof value === "object" && key in value) {
+          value = value[key];
+        } else {
+          value = translations.en;
+          for (const fallbackKey of keys) {
+            if (value && typeof value === "object" && fallbackKey in value) {
+              value = value[fallbackKey];
+            } else {
+              return keyPath;
+            }
+          }
+          break;
+        }
+      }
+      if (typeof value !== "string") {
+        return keyPath;
+      }
+      if (params) {
+        return value.replace(/\{(\w+)\}/g, (match, paramKey) => {
+          return params[paramKey] !== void 0 ? String(params[paramKey]) : match;
+        });
+      }
+      return value;
+    }
+    function getCurrentLocale() {
+      return currentLocale;
+    }
+    function setLocale(locale) {
+      if (isValidLocale(locale)) {
+        currentLocale = locale;
+      }
+    }
+    function getAvailableLocales() {
+      return ["en", "ko", "ja", "zh-CN", "zh-TW"];
+    }
+  }
+});
+
 // backend/dist/cron/tempImageCleanup.js
 var require_tempImageCleanup = __commonJS({
   "backend/dist/cron/tempImageCleanup.js"(exports2) {
@@ -95906,6 +98423,7 @@ var crypto_1 = __importDefault(require("crypto"));
 var runtimePaths_1 = require_runtimePaths();
 var httpsOptions_1 = require_httpsOptions();
 var networkInfo_1 = require_networkInfo();
+var startupCheck_1 = require_startupCheck();
 var index_1 = require_images();
 var promptCollection_1 = __importDefault(require_promptCollection());
 var promptGroups_1 = __importDefault(require_promptGroups());
@@ -95926,6 +98444,8 @@ var image_editor_routes_1 = __importDefault(require_image_editor_routes());
 var auth_routes_1 = require_auth_routes();
 var fileVerification_1 = __importDefault(require_fileVerification());
 var thumbnails_1 = require_thumbnails();
+var externalApi_routes_1 = __importDefault(require_externalApi_routes());
+var civitai_routes_1 = __importDefault(require_civitai_routes());
 var init_1 = require_init2();
 var userSettingsDb_1 = require_userSettingsDb();
 var authDb_1 = require_authDb();
@@ -96079,6 +98599,8 @@ app.use("/temp", authMiddleware_1.optionalAuth, express_1.default.static(tempDir
 async function registerRoutes() {
   console.log("\u{1F4CB} Registering API routes...");
   app.use("/api/auth", auth_routes_1.authRoutes);
+  app.use("/api/external-api", authMiddleware_1.optionalAuth, externalApi_routes_1.default);
+  app.use("/api/civitai", readOnlyLimiter, authMiddleware_1.optionalAuth, civitai_routes_1.default);
   app.use("/api/images", readOnlyLimiter, authMiddleware_1.optionalAuth, index_1.imageRoutes);
   app.use("/api/prompt-collection", readOnlyLimiter, authMiddleware_1.optionalAuth, promptCollection_1.default);
   app.use("/api/prompt-groups", readOnlyLimiter, authMiddleware_1.optionalAuth, promptGroups_1.default);
@@ -96135,8 +98657,11 @@ app.get("/health", (req, res) => {
 async function startServer() {
   try {
     console.log("\u{1F680} ComfyUI Image Manager Backend \uC2DC\uC791 \uC911...\n");
+    const { initI18n } = await Promise.resolve().then(() => __importStar(require_i18n()));
+    initI18n();
     console.log("\u{1F4C1} \uD544\uC694\uD55C \uD3F4\uB354\uB4E4\uC744 \uD655\uC778\uD558\uACE0 \uC0DD\uC131 \uC911...");
     (0, runtimePaths_1.ensureRuntimeDirectories)();
+    await startupCheck_1.StartupCheck.runAllChecks();
     console.log("\u2699\uFE0F  \uD658\uACBD \uC124\uC815\uC744 \uD655\uC778\uD558\uACE0 \uC0DD\uC131 \uC911...");
     createEnvFileIfNotExists();
     console.log("\u{1F5C4}\uFE0F  \uB370\uC774\uD130\uBCA0\uC774\uC2A4\uB97C \uCD08\uAE30\uD654\uD558\uB294 \uC911...");

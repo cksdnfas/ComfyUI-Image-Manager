@@ -275,6 +275,6 @@ services:
 
 ---
 
-**Build Date**: 2025-11-18T14:56:28.192Z
+**Build Date**: 2025-11-23T10:48:59.089Z
 **Version**: 1.0.0
 **Docker Image**: comfyui-image-manager:latest
