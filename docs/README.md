@@ -8,7 +8,7 @@ AI Image Management and Analysis System for ComfyUI
 
 ComfyUI Image Manager is a comprehensive system for managing, analyzing, and organizing AI-generated images. It provides automatic metadata extraction, AI-powered tagging, and advanced search capabilities to help you efficiently manage your image library.
 
-<video src="/docsassets/Preview.mp4" controls width="100%"></video>
+<video src="/docs/assets/Preview.mp4" controls width="100%"></video>
 
 ## Major Features
 
