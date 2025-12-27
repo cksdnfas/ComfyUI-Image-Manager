@@ -1,5 +1,5 @@
 // ComfyUI Image Manager - Bundled Backend
-// Generated: 2025-11-23T10:48:57.023Z
+// Generated: 2025-12-27T11:10:59.407Z
 // Node.js v22.20.0
 
 "use strict";
@@ -421,67 +421,6 @@ var require_main = __commonJS({
     module2.exports.parse = DotenvModule.parse;
     module2.exports.populate = DotenvModule.populate;
     module2.exports = DotenvModule;
-  }
-});
-
-// node_modules/dotenv/lib/env-options.js
-var require_env_options = __commonJS({
-  "node_modules/dotenv/lib/env-options.js"(exports2, module2) {
-    var options = {};
-    if (process.env.DOTENV_CONFIG_ENCODING != null) {
-      options.encoding = process.env.DOTENV_CONFIG_ENCODING;
-    }
-    if (process.env.DOTENV_CONFIG_PATH != null) {
-      options.path = process.env.DOTENV_CONFIG_PATH;
-    }
-    if (process.env.DOTENV_CONFIG_QUIET != null) {
-      options.quiet = process.env.DOTENV_CONFIG_QUIET;
-    }
-    if (process.env.DOTENV_CONFIG_DEBUG != null) {
-      options.debug = process.env.DOTENV_CONFIG_DEBUG;
-    }
-    if (process.env.DOTENV_CONFIG_OVERRIDE != null) {
-      options.override = process.env.DOTENV_CONFIG_OVERRIDE;
-    }
-    if (process.env.DOTENV_CONFIG_DOTENV_KEY != null) {
-      options.DOTENV_KEY = process.env.DOTENV_CONFIG_DOTENV_KEY;
-    }
-    module2.exports = options;
-  }
-});
-
-// node_modules/dotenv/lib/cli-options.js
-var require_cli_options = __commonJS({
-  "node_modules/dotenv/lib/cli-options.js"(exports2, module2) {
-    var re = /^dotenv_config_(encoding|path|quiet|debug|override|DOTENV_KEY)=(.+)$/;
-    module2.exports = function optionMatcher(args) {
-      const options = args.reduce(function(acc, cur) {
-        const matches = cur.match(re);
-        if (matches) {
-          acc[matches[1]] = matches[2];
-        }
-        return acc;
-      }, {});
-      if (!("quiet" in options)) {
-        options.quiet = "true";
-      }
-      return options;
-    };
-  }
-});
-
-// node_modules/dotenv/config.js
-var require_config = __commonJS({
-  "node_modules/dotenv/config.js"() {
-    (function() {
-      require_main().config(
-        Object.assign(
-          {},
-          require_env_options(),
-          require_cli_options()(process.argv)
-        )
-      );
-    })();
   }
 });
 
@@ -27548,16 +27487,29 @@ var require_runtimePaths = __commonJS({
     var overrideBasePath = process.env.RUNTIME_BASE_PATH;
     var basePath = (() => {
       if (overrideBasePath && overrideBasePath.trim().length > 0) {
-        return path_12.default.resolve(overrideBasePath);
+        const cleaned = overrideBasePath.trim().split("#")[0].trim();
+        if (cleaned.length > 0) {
+          const resolved2 = path_12.default.resolve(cleaned);
+          console.log(`[Config] Base path overridden by RUNTIME_BASE_PATH: ${resolved2}`);
+          return resolved2;
+        }
       }
       const portableDir = process.env.PORTABLE_EXECUTABLE_DIR;
       if (portableDir && portableDir.trim().length > 0) {
-        return path_12.default.resolve(portableDir);
+        const resolved2 = path_12.default.resolve(portableDir);
+        console.log(`[Config] Base path set from PORTABLE_EXECUTABLE_DIR: ${resolved2}`);
+        return resolved2;
       }
-      if (false) {
-        return path_12.default.resolve(process.cwd(), "..");
+      const currentCwd = process.cwd();
+      const cwdBasename = path_12.default.basename(currentCwd);
+      if (cwdBasename === "backend" || cwdBasename === "dist") {
+        const resolved2 = path_12.default.resolve(currentCwd, "..");
+        console.log(`[Config] Base path resolved from subdirectory '${cwdBasename}': ${resolved2}`);
+        return resolved2;
       }
-      return path_12.default.resolve(process.cwd());
+      const resolved = path_12.default.resolve(currentCwd);
+      console.log(`[Config] Base path defaulting to CWD: ${resolved}`);
+      return resolved;
     })();
     function resolvePath(envVar, defaultPath) {
       if (envVar && envVar.trim().length > 0) {
@@ -27586,7 +27538,7 @@ var require_runtimePaths = __commonJS({
       }
       return `http://${url}`;
     }
-    var resolvedPort = process.env.PORT || "1566";
+    var resolvedPort = process.env.PORT || "1666";
     var publicBaseUrl = (() => {
       const overrides = [process.env.PUBLIC_BASE_URL, process.env.BACKEND_ORIGIN];
       const explicit = overrides.find((value) => value && value.trim().length > 0);
@@ -27615,10 +27567,21 @@ var require_runtimePaths = __commonJS({
       tempBaseUrl: tempPublicBase
     };
     function ensureRuntimeDirectories() {
+      console.log("fyp [Config] Data Root Configuration:");
+      console.log(`   - Base Path:   ${basePath}`);
+      console.log(`   - Uploads:     ${uploadsDir2}`);
+      console.log(`   - Database:    ${databaseDir}`);
+      console.log(`   - Logs:        ${logsDir}`);
+      console.log(`   - Models:      ${modelsDir}`);
+      console.log(`   - Temp:        ${tempDir2}`);
       [uploadsDir2, databaseDir, logsDir, tempDir2, modelsDir, recycleBinDir].forEach((dir) => {
         if (!fs_12.default.existsSync(dir)) {
-          fs_12.default.mkdirSync(dir, { recursive: true });
-          console.log(`\u2705 Created directory: ${path_12.default.basename(dir)}`);
+          try {
+            fs_12.default.mkdirSync(dir, { recursive: true });
+            console.log(`\u2705 Created directory: ${path_12.default.basename(dir)}`);
+          } catch (error) {
+            console.error(`\u274C Failed to create directory: ${dir}`, error);
+          }
         }
       });
       const subdirectories = [
@@ -27628,8 +27591,12 @@ var require_runtimePaths = __commonJS({
       ];
       subdirectories.forEach((dir) => {
         if (!fs_12.default.existsSync(dir)) {
-          fs_12.default.mkdirSync(dir, { recursive: true });
-          console.log(`\u2705 Created subdirectory: ${path_12.default.relative(basePath, dir)}`);
+          try {
+            fs_12.default.mkdirSync(dir, { recursive: true });
+            console.log(`\u2705 Created subdirectory: ${path_12.default.relative(basePath, dir)}`);
+          } catch (error) {
+            console.error(`\u274C Failed to create subdirectory: ${dir}`, error);
+          }
         }
       });
     }
@@ -53530,6 +53497,102 @@ var require_settingsService = __commonJS({
   }
 });
 
+// backend/dist/utils/logger.js
+var require_logger = __commonJS({
+  "backend/dist/utils/logger.js"(exports2) {
+    "use strict";
+    var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
+      return mod && mod.__esModule ? mod : { "default": mod };
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.logger = void 0;
+    var fs_12 = __importDefault2(require("fs"));
+    var path_12 = __importDefault2(require("path"));
+    var util_1 = __importDefault2(require("util"));
+    var runtimePaths_12 = require_runtimePaths();
+    var LoggerService = class {
+      constructor() {
+        this.logStream = null;
+        this.initialized = false;
+        this.logFile = path_12.default.join(runtimePaths_12.runtimePaths.logsDir, `app-${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.log`);
+        this.ensureLogDir();
+        this.createLogStream();
+      }
+      ensureLogDir() {
+        if (!fs_12.default.existsSync(runtimePaths_12.runtimePaths.logsDir)) {
+          try {
+            fs_12.default.mkdirSync(runtimePaths_12.runtimePaths.logsDir, { recursive: true });
+          } catch (err) {
+            console.error("Failed to create log directory:", err);
+          }
+        }
+      }
+      createLogStream() {
+        try {
+          this.logStream = fs_12.default.createWriteStream(this.logFile, { flags: "a" });
+          this.initialized = true;
+        } catch (err) {
+          console.error("Failed to create log stream:", err);
+        }
+      }
+      formatMessage(level, message, ...args) {
+        const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+        let formattedArgs = "";
+        if (args.length > 0) {
+          formattedArgs = " " + args.map((arg) => {
+            if (arg instanceof Error) {
+              return arg.stack || arg.message;
+            }
+            if (typeof arg === "object") {
+              return util_1.default.inspect(arg, { depth: null, colors: false });
+            }
+            return String(arg);
+          }).join(" ");
+        }
+        return `[${timestamp}] [${level}] ${message}${formattedArgs}
+`;
+      }
+      writeToFile(message) {
+        if (this.initialized && this.logStream) {
+          this.logStream.write(message);
+        } else {
+          try {
+            fs_12.default.appendFileSync(this.logFile, message);
+          } catch (e) {
+          }
+        }
+      }
+      log(level, message, ...args) {
+        const formattedMessage = this.formatMessage(level, message, ...args);
+        this.writeToFile(formattedMessage);
+        if (level === "INFO") {
+          console.log(message, ...args);
+        } else if (level === "WARN") {
+          console.warn(message, ...args);
+        } else if (level === "ERROR") {
+          console.error(message, ...args);
+        }
+      }
+      info(message, ...args) {
+        this.log("INFO", message, ...args);
+      }
+      warn(message, ...args) {
+        this.log("WARN", message, ...args);
+      }
+      error(message, ...args) {
+        this.log("ERROR", message, ...args);
+      }
+      debug(message, ...args) {
+        this.log("DEBUG", message, ...args);
+      }
+      verbose(message, ...args) {
+        this.log("VERBOSE", message, ...args);
+      }
+    };
+    exports2.logger = new LoggerService();
+  }
+});
+
 // backend/dist/services/metadata/extractors/pngExtractor.js
 var require_pngExtractor = __commonJS({
   "backend/dist/services/metadata/extractors/pngExtractor.js"(exports2) {
@@ -53540,6 +53603,7 @@ var require_pngExtractor = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.PngExtractor = void 0;
     var zlib_1 = __importDefault2(require("zlib"));
+    var logger_1 = require_logger();
     var PngExtractor = class {
       static extract(buffer) {
         const aiInfo = {};
@@ -53552,7 +53616,7 @@ var require_pngExtractor = __commonJS({
             }
           }
           if (textChunks["parameters"]) {
-            console.log("\u2705 WebUI parameters found in textChunks (priority extraction)");
+            logger_1.logger.debug("\u2705 WebUI parameters found in textChunks (priority extraction)");
             let result = { parameters: textChunks["parameters"] };
             if (textChunks["prompt"]) {
               const promptValue = textChunks["prompt"];
@@ -53563,7 +53627,7 @@ var require_pngExtractor = __commonJS({
                   for (const key in parsed) {
                     const node = parsed[key];
                     if (node && typeof node === "object" && node.class_type) {
-                      console.log("\u2139\uFE0F ComfyUI workflow also found (stored as supplementary data)");
+                      logger_1.logger.debug("\u2139\uFE0F ComfyUI workflow also found (stored as supplementary data)");
                       result.comfyui_workflow = promptValue;
                       break;
                     }
@@ -53583,7 +53647,7 @@ var require_pngExtractor = __commonJS({
                 for (const key in parsed) {
                   const node = parsed[key];
                   if (node && typeof node === "object" && node.class_type) {
-                    console.log("\u2705 ComfyUI workflow found in textChunks[prompt] (no parameters field)");
+                    logger_1.logger.debug("\u2705 ComfyUI workflow found in textChunks[prompt] (no parameters field)");
                     return { comfyui_workflow: promptValue };
                   }
                 }
@@ -53594,13 +53658,13 @@ var require_pngExtractor = __commonJS({
           }
           for (const data of rawStrings) {
             if (data.includes("parameters") && data.includes("Steps:")) {
-              console.log("\u2705 WebUI parameters found in rawStrings");
+              logger_1.logger.debug("\u2705 WebUI parameters found in rawStrings");
               return { parameters: data };
             }
           }
           return { textChunks, rawStrings };
         } catch (error) {
-          console.warn("PNG metadata extraction error:", error);
+          logger_1.logger.warn("PNG metadata extraction error:", error);
           return {};
         }
       }
@@ -54306,6 +54370,7 @@ var require_comfyuiParser = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.ComfyUIParser = void 0;
+    var logger_1 = require_logger();
     var ComfyUIParser = class {
       static isComfyUIWorkflow(data) {
         if (typeof data === "string") {
@@ -54360,7 +54425,7 @@ var require_comfyuiParser = __commonJS({
           const workflow = JSON.parse(sanitizedJSON);
           return this.parseWorkflowObject(workflow);
         } catch (error) {
-          console.warn("ComfyUI workflow parsing error:", error);
+          logger_1.logger.warn("ComfyUI workflow parsing error:", error);
           return {};
         }
       }
@@ -54400,7 +54465,7 @@ var require_comfyuiParser = __commonJS({
           if (clipTextEncodeNodes.length > 1) {
             aiInfo.negative_prompt = clipTextEncodeNodes[1].text;
           }
-          console.log(`\u2705 [ComfyUIParser] Extracted ${clipTextEncodeNodes.length} prompts from CLIPTextEncode nodes`);
+          logger_1.logger.debug(`\u2705 [ComfyUIParser] Extracted ${clipTextEncodeNodes.length} prompts from CLIPTextEncode nodes`);
         }
         if (samplerNode?.inputs) {
           const inputs = samplerNode.inputs;
@@ -54791,11 +54856,12 @@ var require_metadata = __commonJS({
     var workflowDetector_1 = require_workflowDetector();
     var errors_1 = require_errors();
     var fileAccess_1 = require_fileAccess();
+    var logger_1 = require_logger();
     var MetadataExtractor = class {
       static async extractMetadata(filePath) {
         const startTime = Date.now();
         const fileName = path_12.default.basename(filePath);
-        console.log(`\u23F1\uFE0F [MetadataExtractor] Starting extraction: ${fileName}`);
+        logger_1.logger.debug(`\u23F1\uFE0F [MetadataExtractor] Starting extraction: ${fileName}`);
         try {
           try {
             await (0, fileAccess_1.assertFileReadable)(filePath);
@@ -54810,16 +54876,18 @@ var require_metadata = __commonJS({
           } catch (error) {
             throw errors_1.MetadataExtractionError.fromNodeError(filePath, error);
           }
-          console.log(`\u23F1\uFE0F [MetadataExtractor] File read (${(buffer.length / 1024).toFixed(1)}KB): ${Date.now() - readStart}ms`);
+          logger_1.logger.debug(`\u23F1\uFE0F [MetadataExtractor] File read (${(buffer.length / 1024).toFixed(1)}KB): ${Date.now() - readStart}ms`);
           const primaryStart = Date.now();
           let aiInfo = await this.primaryExtraction(buffer, filePath, fileExt);
-          console.log(`\u23F1\uFE0F [MetadataExtractor] Primary extraction: ${Date.now() - primaryStart}ms`);
+          logger_1.logger.debug(`\u23F1\uFE0F [MetadataExtractor] Primary extraction: ${Date.now() - primaryStart}ms`);
           const hasPrompt = Boolean(aiInfo.prompt && typeof aiInfo.prompt === "string" && aiInfo.prompt.trim() || aiInfo.positive_prompt && typeof aiInfo.positive_prompt === "string" && aiInfo.positive_prompt.trim());
-          console.log(`\u{1F50D} [MetadataExtractor] Primary extraction result:`, {
+          const promptPreviewRaw = aiInfo.prompt || aiInfo.positive_prompt;
+          const promptPreview = typeof promptPreviewRaw === "string" ? promptPreviewRaw.substring(0, 50) : promptPreviewRaw ? String(promptPreviewRaw).substring(0, 50) : void 0;
+          logger_1.logger.debug(`\u{1F50D} [MetadataExtractor] Primary extraction result:`, {
             hasPrompt,
             promptLength: aiInfo.prompt?.length || 0,
             positivePromptLength: aiInfo.positive_prompt?.length || 0,
-            promptPreview: (aiInfo.prompt || aiInfo.positive_prompt)?.substring(0, 50)
+            promptPreview
           });
           if (!hasPrompt && fileExt === ".png") {
             const { settingsService } = await Promise.resolve().then(() => __importStar2(require_settingsService()));
@@ -54828,9 +54896,9 @@ var require_metadata = __commonJS({
             if (!metadataSettings.enableSecondaryExtraction) {
               console.log("\u26A1 [MetadataExtractor] Secondary extraction disabled in settings");
             } else if (aiInfo.ai_tool === "ComfyUI" && metadataSettings.skipStealthForComfyUI) {
-              console.log("\u26A1 [MetadataExtractor] Skipping Stealth PNG for ComfyUI (setting enabled)");
+              logger_1.logger.debug("\u26A1 [MetadataExtractor] Skipping Stealth PNG for ComfyUI (setting enabled)");
             } else if ((aiInfo.ai_tool === "Automatic1111" || aiInfo.ai_tool === "Stable Diffusion") && metadataSettings.skipStealthForWebUI) {
-              console.log("\u26A1 [MetadataExtractor] Skipping Stealth PNG for WebUI (setting enabled)");
+              logger_1.logger.debug("\u26A1 [MetadataExtractor] Skipping Stealth PNG for WebUI (setting enabled)");
             } else {
               const fileSizeMB = buffer.length / (1024 * 1024);
               if (fileSizeMB > metadataSettings.stealthMaxFileSizeMB) {
@@ -54846,13 +54914,13 @@ var require_metadata = __commonJS({
                     console.log(`\u26A0\uFE0F [MetadataExtractor] Primary extraction failed - attempting Stealth PNG Info (mode: ${metadataSettings.stealthScanMode})`);
                     const secondaryStart = Date.now();
                     aiInfo = await this.secondaryExtraction(buffer, aiInfo, metadataSettings.stealthScanMode);
-                    console.log(`\u23F1\uFE0F [MetadataExtractor] Secondary extraction: ${Date.now() - secondaryStart}ms`);
+                    logger_1.logger.debug(`\u23F1\uFE0F [MetadataExtractor] Secondary extraction: ${Date.now() - secondaryStart}ms`);
                   }
                 } else {
                   console.log(`\u26A0\uFE0F [MetadataExtractor] Primary extraction failed - attempting Stealth PNG Info (mode: ${metadataSettings.stealthScanMode})`);
                   const secondaryStart = Date.now();
                   aiInfo = await this.secondaryExtraction(buffer, aiInfo, metadataSettings.stealthScanMode);
-                  console.log(`\u23F1\uFE0F [MetadataExtractor] Secondary extraction: ${Date.now() - secondaryStart}ms`);
+                  logger_1.logger.debug(`\u23F1\uFE0F [MetadataExtractor] Secondary extraction: ${Date.now() - secondaryStart}ms`);
                 }
               }
             }
@@ -54867,29 +54935,29 @@ var require_metadata = __commonJS({
           }
           if (aiInfo.negative_prompt) {
             if (workflowDetector_1.WorkflowDetector.isWorkflowJSON(aiInfo.negative_prompt)) {
-              console.warn(`\u26A0\uFE0F [MetadataExtractor] Workflow JSON in negative prompt - invalidating`);
+              logger_1.logger.warn(`\u26A0\uFE0F [MetadataExtractor] Workflow JSON in negative prompt - invalidating`);
               aiInfo.negative_prompt = void 0;
             }
           }
           const detectStart = Date.now();
           this.detectAITool(aiInfo);
-          console.log(`\u23F1\uFE0F [MetadataExtractor] AI tool detection: ${Date.now() - detectStart}ms`);
+          logger_1.logger.debug(`\u23F1\uFE0F [MetadataExtractor] AI tool detection: ${Date.now() - detectStart}ms`);
           const loraStart = Date.now();
           this.processLoRAModels(aiInfo);
-          console.log(`\u23F1\uFE0F [MetadataExtractor] LoRA processing: ${Date.now() - loraStart}ms`);
+          logger_1.logger.debug(`\u23F1\uFE0F [MetadataExtractor] LoRA processing: ${Date.now() - loraStart}ms`);
           if (!aiInfo || Object.keys(aiInfo).length === 0) {
             aiInfo = {
               ai_tool: "Unknown"
             };
           }
           const totalTime = Date.now() - startTime;
-          console.log(`\u23F1\uFE0F [MetadataExtractor] \u2705 Total extraction time: ${totalTime}ms`);
+          logger_1.logger.debug(`\u23F1\uFE0F [MetadataExtractor] \u2705 Total extraction time: ${totalTime}ms`);
           return {
             extractedAt: (/* @__PURE__ */ new Date()).toISOString(),
             ai_info: aiInfo
           };
         } catch (error) {
-          console.error(`\u23F1\uFE0F [MetadataExtractor] \u274C Failed after ${Date.now() - startTime}ms:`, error);
+          logger_1.logger.error(`\u23F1\uFE0F [MetadataExtractor] \u274C Failed after ${Date.now() - startTime}ms:`, error);
           if (error instanceof errors_1.MetadataExtractionError) {
             throw error;
           }
@@ -54914,95 +54982,95 @@ var require_metadata = __commonJS({
       }
       static async secondaryExtraction(buffer, existingAiInfo, scanMode = "fast") {
         try {
-          console.log(`\u{1F50D} [secondaryExtraction] Starting Stealth PNG Info extraction (mode: ${scanMode})...`);
-          console.log("\u{1F4CA} [secondaryExtraction] Buffer size:", buffer.length, "bytes");
+          logger_1.logger.debug(`\u{1F50D} [secondaryExtraction] Starting Stealth PNG Info extraction (mode: ${scanMode})...`);
+          logger_1.logger.debug(`\u{1F4CA} [secondaryExtraction] Buffer size: ${buffer.length} bytes`);
           const stealthData = await stealthPngExtractor_1.StealthPngExtractor.extractStealthPngInfo(buffer, scanMode);
           if (!stealthData) {
-            console.log("\u274C [secondaryExtraction] Stealth PNG Info not found - keeping original");
-            console.log("\u{1F4CB} [secondaryExtraction] Original aiInfo:", {
+            logger_1.logger.debug("\u274C [secondaryExtraction] Stealth PNG Info not found - keeping original");
+            logger_1.logger.debug("\u{1F4CB} [secondaryExtraction] Original aiInfo:", {
               hasPrompt: !!existingAiInfo.prompt,
               hasPositivePrompt: !!existingAiInfo.positive_prompt,
               aiTool: existingAiInfo.ai_tool
             });
             return existingAiInfo;
           }
-          console.log("\u2705 [secondaryExtraction] Stealth PNG Info extracted successfully!");
-          console.log(`\u{1F4CA} [secondaryExtraction] Stealth data length: ${stealthData.length} characters`);
-          console.log("\u{1F4C4} [secondaryExtraction] First 200 chars:", stealthData.substring(0, 200));
-          console.log("\u{1F4C4} [secondaryExtraction] Last 100 chars:", stealthData.substring(Math.max(0, stealthData.length - 100)));
+          logger_1.logger.debug("\u2705 [secondaryExtraction] Stealth PNG Info extracted successfully!");
+          logger_1.logger.debug(`\u{1F4CA} [secondaryExtraction] Stealth data length: ${stealthData.length} characters`);
+          logger_1.logger.debug("\u{1F4C4} [secondaryExtraction] First 200 chars:", stealthData.substring(0, 200));
+          logger_1.logger.debug("\u{1F4C4} [secondaryExtraction] Last 100 chars:", stealthData.substring(Math.max(0, stealthData.length - 100)));
           const looksLikeJSON = stealthData.trim().startsWith("{") || stealthData.trim().startsWith("[");
           const looksLikeWebUI = stealthData.includes("Steps:") || stealthData.includes("parameters");
-          console.log("\u{1F50D} [secondaryExtraction] Data format hints:", {
+          logger_1.logger.debug("\u{1F50D} [secondaryExtraction] Data format hints:", {
             looksLikeJSON,
             looksLikeWebUI,
             startsWithBrace: stealthData.trim()[0],
             includesSteps: stealthData.includes("Steps:"),
             includesParameters: stealthData.includes("parameters")
           });
-          console.log("\u{1F504} [secondaryExtraction] Calling parseRawData...");
+          logger_1.logger.debug("\u{1F504} [secondaryExtraction] Calling parseRawData...");
           const parsedData = this.parseRawData({ stealthData });
-          console.log("\u{1F4E6} [secondaryExtraction] Parse result:", {
+          logger_1.logger.debug("\u{1F4E6} [secondaryExtraction] Parse result:", {
             hasPrompt: !!parsedData.prompt,
             hasPositivePrompt: !!parsedData.positive_prompt,
             hasNegativePrompt: !!parsedData.negative_prompt,
             aiTool: parsedData.ai_tool,
-            promptPreview: (parsedData.prompt || parsedData.positive_prompt)?.substring(0, 50)
+            promptPreview: String(parsedData.prompt || parsedData.positive_prompt || "").substring(0, 50)
           });
           if (parsedData && (parsedData.prompt || parsedData.positive_prompt)) {
             const finalPrompt = parsedData.prompt || parsedData.positive_prompt;
             const trimmedPrompt = finalPrompt?.trim();
             if (trimmedPrompt && trimmedPrompt.length > 0) {
-              console.log("\u2705 [secondaryExtraction] Successfully parsed Stealth PNG Info with valid prompts");
-              console.log("\u{1F4DD} [secondaryExtraction] Extracted prompt length:", trimmedPrompt.length);
+              logger_1.logger.debug("\u2705 [secondaryExtraction] Successfully parsed Stealth PNG Info with valid prompts");
+              logger_1.logger.debug("\u{1F4DD} [secondaryExtraction] Extracted prompt length:", trimmedPrompt.length);
               return parsedData;
             } else {
-              console.log("\u26A0\uFE0F [secondaryExtraction] Prompt exists but is empty or whitespace only");
+              logger_1.logger.debug("\u26A0\uFE0F [secondaryExtraction] Prompt exists but is empty or whitespace only");
             }
           }
-          console.log("\u274C [secondaryExtraction] Stealth data parsing failed - no valid prompts found");
-          console.log("\u{1F4CB} [secondaryExtraction] Reverting to original aiInfo");
+          logger_1.logger.debug("\u274C [secondaryExtraction] Stealth data parsing failed - no valid prompts found");
+          logger_1.logger.debug("\u{1F4CB} [secondaryExtraction] Reverting to original aiInfo");
           return existingAiInfo;
         } catch (error) {
-          console.error("\u274C [secondaryExtraction] Exception occurred:", error);
+          logger_1.logger.error("\u274C [secondaryExtraction] Exception occurred:", error);
           if (error instanceof Error) {
-            console.error("\u{1F4CB} [secondaryExtraction] Error stack:", error.stack);
+            logger_1.logger.error("\u{1F4CB} [secondaryExtraction] Error stack:", error.stack);
           }
           return existingAiInfo;
         }
       }
       static parseRawData(rawData) {
-        console.log("\u{1F50D} [parseRawData] Input type:", typeof rawData, {
+        logger_1.logger.debug("\u{1F50D} [parseRawData] Input type:", typeof rawData, {
           hasStealthData: !!rawData.stealthData,
           stealthDataLength: rawData.stealthData?.length || 0,
-          stealthDataPreview: rawData.stealthData?.substring(0, 100),
+          stealthDataPreview: rawData.stealthData ? String(rawData.stealthData).substring(0, 100) : void 0,
           hasComfyUIWorkflow: !!rawData.comfyui_workflow,
           hasParameters: !!rawData.parameters
         });
         if (novelaiParser_1.NovelAIParser.isNovelAIFormat(rawData)) {
-          console.log("\u{1F4E6} [MetadataExtractor] Parsing as NovelAI format");
+          logger_1.logger.debug("\u{1F4E6} [MetadataExtractor] Parsing as NovelAI format");
           return novelaiParser_1.NovelAIParser.parse(rawData);
         }
         if (webuiParser_1.WebUIParser.isWebUIFormat(rawData)) {
-          console.log("\u{1F4E6} [MetadataExtractor] Parsing as WebUI format");
+          logger_1.logger.debug("\u{1F4E6} [MetadataExtractor] Parsing as WebUI format");
           const result = webuiParser_1.WebUIParser.parse(rawData);
           if (rawData.comfyui_workflow && !result.ai_tool) {
-            console.log("\u2139\uFE0F [MetadataExtractor] ComfyUI workflow detected - marking as ComfyUI");
+            logger_1.logger.debug("\u2139\uFE0F [MetadataExtractor] ComfyUI workflow detected - marking as ComfyUI");
             result.ai_tool = "ComfyUI";
           }
           return result;
         }
         if (rawData.comfyui_workflow) {
-          console.log("\u{1F4E6} [MetadataExtractor] Parsing as ComfyUI workflow format (fallback)");
+          logger_1.logger.debug("\u{1F4E6} [MetadataExtractor] Parsing as ComfyUI workflow format (fallback)");
           return comfyuiParser_1.ComfyUIParser.parse(rawData);
         }
         if (rawData.stealthData) {
-          console.log("\u{1F50D} [parseRawData] Attempting to parse stealth data...");
+          logger_1.logger.debug("\u{1F50D} [parseRawData] Attempting to parse stealth data...");
           const isNovelAI = novelaiParser_1.NovelAIParser.isNovelAIFormat(rawData.stealthData);
-          console.log("\u{1F50D} [parseRawData] Is NovelAI format?", isNovelAI);
+          logger_1.logger.debug("\u{1F50D} [parseRawData] Is NovelAI format?", isNovelAI);
           if (isNovelAI) {
-            console.log("\u{1F4E6} [MetadataExtractor] Parsing stealth data as NovelAI format");
+            logger_1.logger.debug("\u{1F4E6} [MetadataExtractor] Parsing stealth data as NovelAI format");
             const result = novelaiParser_1.NovelAIParser.parse(rawData.stealthData);
-            console.log("\u2705 [parseRawData] NovelAI parse result:", {
+            logger_1.logger.debug("\u2705 [parseRawData] NovelAI parse result:", {
               hasPrompt: !!result.prompt,
               hasPositivePrompt: !!result.positive_prompt,
               hasNegativePrompt: !!result.negative_prompt
@@ -55010,21 +55078,21 @@ var require_metadata = __commonJS({
             return result;
           }
           const isWebUI = webuiParser_1.WebUIParser.isWebUIFormat(rawData.stealthData);
-          console.log("\u{1F50D} [parseRawData] Is WebUI format?", isWebUI);
+          logger_1.logger.debug("\u{1F50D} [parseRawData] Is WebUI format?", isWebUI);
           if (isWebUI) {
-            console.log("\u{1F4E6} [MetadataExtractor] Parsing stealth data as WebUI format");
+            logger_1.logger.debug("\u{1F4E6} [MetadataExtractor] Parsing stealth data as WebUI format");
             const result = webuiParser_1.WebUIParser.parse(rawData.stealthData);
-            console.log("\u2705 [parseRawData] WebUI parse result:", {
+            logger_1.logger.debug("\u2705 [parseRawData] WebUI parse result:", {
               hasPrompt: !!result.prompt,
               hasPositivePrompt: !!result.positive_prompt,
               hasNegativePrompt: !!result.negative_prompt
             });
             return result;
           }
-          console.log("\u274C [parseRawData] Stealth data found but format not recognized");
-          console.log("\u{1F4C4} [parseRawData] Raw stealth data sample:", rawData.stealthData.substring(0, 200));
+          logger_1.logger.debug("\u274C [parseRawData] Stealth data found but format not recognized");
+          logger_1.logger.debug("\u{1F4C4} [parseRawData] Raw stealth data sample:", typeof rawData.stealthData === "string" ? rawData.stealthData.substring(0, 200) : rawData.stealthData);
         }
-        console.log("\u26A0\uFE0F [MetadataExtractor] No recognized format found");
+        logger_1.logger.debug("\u26A0\uFE0F [MetadataExtractor] No recognized format found");
         return {};
       }
       static detectAITool(aiInfo) {
@@ -56362,6 +56430,11 @@ var require_autoTagSearchService = __commonJS({
           conditions.push(...characterConditions.conditions);
           params.push(...characterConditions.params);
         }
+        if (searchParams.any_tags && searchParams.any_tags.length > 0) {
+          const anyConditions = this.buildAnyTagConditions(searchParams.any_tags);
+          conditions.push(...anyConditions.conditions);
+          params.push(...anyConditions.params);
+        }
         if (searchParams.model) {
           conditions.push(`json_extract(i.auto_tags, '$.model') = ?`);
           params.push(searchParams.model);
@@ -56451,6 +56524,35 @@ var require_autoTagSearchService = __commonJS({
           } else {
             conditions.push(existsCondition);
           }
+        }
+        return { conditions, params };
+      }
+      static buildAnyTagConditions(tags) {
+        const conditions = [];
+        const params = [];
+        for (const tagFilter of tags) {
+          const hasScoreFilter = tagFilter.min_score !== void 0 || tagFilter.max_score !== void 0;
+          const searchVariants = this.normalizeSearchTerm(tagFilter.tag, hasScoreFilter);
+          const variantConditions = [];
+          for (const variant of searchVariants) {
+            const generalCondition = `
+          EXISTS (
+            SELECT 1 FROM json_each(i.auto_tags, '$.general')
+            WHERE LOWER(key) LIKE ?
+          )
+        `.trim();
+            const characterCondition = `
+          EXISTS (
+            SELECT 1 FROM json_each(i.auto_tags, '$.character')
+            WHERE LOWER(key) LIKE ?
+          )
+        `.trim();
+            variantConditions.push(`(${generalCondition} OR ${characterCondition})`);
+            params.push(`%${variant}%`);
+            params.push(`%${variant}%`);
+          }
+          const existsCondition = `(${variantConditions.join(" OR ")})`;
+          conditions.push(existsCondition);
         }
         return { conditions, params };
       }
@@ -58125,6 +58227,17 @@ var require_PromptCollection = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.PromptCollectionModel = void 0;
     var init_12 = require_init2();
+    var getTableName = (type) => {
+      switch (type) {
+        case "auto":
+          return "auto_prompt_collection";
+        case "negative":
+          return "negative_prompt_collection";
+        case "positive":
+        default:
+          return "prompt_collection";
+      }
+    };
     var PromptCollectionModel = class {
       static async addOrIncrement(prompt, group_id) {
         const row = init_12.db.prepare("SELECT id, usage_count FROM prompt_collection WHERE prompt = ?").get(prompt);
@@ -58147,6 +58260,19 @@ var require_PromptCollection = __commonJS({
         } else {
           const info = init_12.db.prepare(`
         INSERT INTO negative_prompt_collection (prompt, usage_count, group_id)
+        VALUES (?, 1, ?)
+      `).run(prompt, group_id || null);
+          return info.lastInsertRowid;
+        }
+      }
+      static async addOrIncrementAuto(prompt, group_id) {
+        const row = init_12.db.prepare("SELECT id, usage_count FROM auto_prompt_collection WHERE prompt = ?").get(prompt);
+        if (row) {
+          init_12.db.prepare("UPDATE auto_prompt_collection SET usage_count = usage_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(row.id);
+          return row.id;
+        } else {
+          const info = init_12.db.prepare(`
+        INSERT INTO auto_prompt_collection (prompt, usage_count, group_id)
         VALUES (?, 1, ?)
       `).run(prompt, group_id || null);
           return info.lastInsertRowid;
@@ -58196,6 +58322,28 @@ var require_PromptCollection = __commonJS({
         transaction();
         return processedCount;
       }
+      static async batchAddOrIncrementAuto(prompts) {
+        if (!prompts || prompts.length === 0) {
+          return 0;
+        }
+        let processedCount = 0;
+        const transaction = init_12.db.transaction(() => {
+          const selectStmt = init_12.db.prepare("SELECT id, usage_count FROM auto_prompt_collection WHERE prompt = ?");
+          const updateStmt = init_12.db.prepare("UPDATE auto_prompt_collection SET usage_count = usage_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+          const insertStmt = init_12.db.prepare("INSERT INTO auto_prompt_collection (prompt, usage_count, group_id) VALUES (?, 1, ?)");
+          for (const item of prompts) {
+            const row = selectStmt.get(item.prompt);
+            if (row) {
+              updateStmt.run(row.id);
+            } else {
+              insertStmt.run(item.prompt, item.group_id || null);
+            }
+            processedCount++;
+          }
+        });
+        transaction();
+        return processedCount;
+      }
       static async searchPrompts(query, page = 1, limit = 20, sortBy = "usage_count", sortOrder = "DESC") {
         const searchPattern = `%${query}%`;
         const offset = (page - 1) * limit;
@@ -58213,6 +58361,26 @@ var require_PromptCollection = __commonJS({
           group_id: row.group_id,
           synonyms: row.synonyms ? JSON.parse(row.synonyms) : [],
           type: "positive"
+        }));
+        return { prompts, total };
+      }
+      static async searchAutoPrompts(query, page = 1, limit = 20, sortBy = "usage_count", sortOrder = "DESC") {
+        const searchPattern = `%${query}%`;
+        const offset = (page - 1) * limit;
+        const countRow = init_12.db.prepare("SELECT COUNT(*) as total FROM auto_prompt_collection WHERE prompt LIKE ?").get(searchPattern);
+        const total = countRow.total;
+        const rows = init_12.db.prepare(`SELECT id, prompt, usage_count, group_id, synonyms
+       FROM auto_prompt_collection
+       WHERE prompt LIKE ?
+       ORDER BY ${sortBy} ${sortOrder}
+       LIMIT ? OFFSET ?`).all(searchPattern, limit, offset);
+        const prompts = rows.map((row) => ({
+          id: row.id,
+          prompt: row.prompt,
+          usage_count: row.usage_count,
+          group_id: row.group_id,
+          synonyms: row.synonyms ? JSON.parse(row.synonyms) : [],
+          type: "auto"
         }));
         return { prompts, total };
       }
@@ -58252,18 +58420,18 @@ var require_PromptCollection = __commonJS({
         return prompts;
       }
       static async setSynonyms(id, synonyms, type = "positive") {
-        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const tableName = getTableName(type);
         const synonymsJson = JSON.stringify(synonyms);
         const info = init_12.db.prepare(`UPDATE ${tableName} SET synonyms = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(synonymsJson, id);
         return info.changes > 0;
       }
       static async setGroupId(id, group_id, type = "positive") {
-        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const tableName = getTableName(type);
         const info = init_12.db.prepare(`UPDATE ${tableName} SET group_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(group_id, id);
         return info.changes > 0;
       }
       static async decrementUsage(prompt, type = "positive") {
-        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const tableName = getTableName(type);
         const row = init_12.db.prepare(`SELECT id, usage_count FROM ${tableName} WHERE prompt = ?`).get(prompt);
         if (!row) {
           return false;
@@ -58275,12 +58443,12 @@ var require_PromptCollection = __commonJS({
         return info.changes > 0;
       }
       static async delete(id, type = "positive") {
-        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const tableName = getTableName(type);
         const info = init_12.db.prepare(`DELETE FROM ${tableName} WHERE id = ?`).run(id);
         return info.changes > 0;
       }
       static async exportAllSettings(type = "positive") {
-        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const tableName = getTableName(type);
         const rows = init_12.db.prepare(`SELECT prompt, group_id, synonyms FROM ${tableName}
        WHERE group_id IS NOT NULL OR synonyms IS NOT NULL
        ORDER BY prompt`).all();
@@ -58292,7 +58460,7 @@ var require_PromptCollection = __commonJS({
         return settings;
       }
       static async importSettings(settings, type = "positive") {
-        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const tableName = getTableName(type);
         let updatedCount = 0;
         if (settings.length === 0) {
           return 0;
@@ -58325,9 +58493,31 @@ var require_PromptGroup = __commonJS({
     exports2.PromptGroupModel = void 0;
     var init_12 = require_init2();
     var dynamicUpdate_1 = require_dynamicUpdate();
+    var getTableName = (type) => {
+      switch (type) {
+        case "auto":
+          return "auto_prompt_groups";
+        case "negative":
+          return "negative_prompt_groups";
+        case "positive":
+        default:
+          return "prompt_groups";
+      }
+    };
+    var getPromptTableName = (type) => {
+      switch (type) {
+        case "auto":
+          return "auto_prompt_collection";
+        case "negative":
+          return "negative_prompt_collection";
+        case "positive":
+        default:
+          return "prompt_collection";
+      }
+    };
     var PromptGroupModel = class {
       static async create(data, type = "positive") {
-        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const tableName = getTableName(type);
         const existing = await this.findByName(data.group_name, type);
         if (existing) {
           return existing.id;
@@ -58342,9 +58532,9 @@ var require_PromptGroup = __commonJS({
       }
       static insertGroup(tableName, data) {
         const info = init_12.db.prepare(`
-      INSERT OR IGNORE INTO ${tableName} (group_name, display_order, is_visible)
-      VALUES (?, ?, ?)
-    `).run(data.group_name, data.display_order || 0, data.is_visible !== void 0 ? data.is_visible ? 1 : 0 : 1);
+      INSERT OR IGNORE INTO ${tableName} (group_name, display_order, is_visible, parent_id)
+      VALUES (?, ?, ?, ?)
+    `).run(data.group_name, data.display_order || 0, data.is_visible !== void 0 ? data.is_visible ? 1 : 0 : 1, data.parent_id || null);
         if (info.changes === 0) {
           const existing = init_12.db.prepare(`SELECT id FROM ${tableName} WHERE group_name = ?`).get(data.group_name);
           if (existing) {
@@ -58354,14 +58544,14 @@ var require_PromptGroup = __commonJS({
         return info.lastInsertRowid;
       }
       static async findAll(includeHidden = false, type = "positive") {
-        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const tableName = getTableName(type);
         const visibilityFilter = includeHidden ? "" : "WHERE is_visible = 1";
         const rows = init_12.db.prepare(`SELECT * FROM ${tableName} ${visibilityFilter} ORDER BY display_order ASC`).all();
         return rows || [];
       }
       static async findAllWithCounts(includeHidden = false, type = "positive") {
-        const groupTableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
-        const promptTableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const groupTableName = getTableName(type);
+        const promptTableName = getPromptTableName(type);
         const visibilityFilter = includeHidden ? "" : "WHERE g.is_visible = 1";
         const rows = init_12.db.prepare(`SELECT
        g.*,
@@ -58374,17 +58564,17 @@ var require_PromptGroup = __commonJS({
         return rows || [];
       }
       static async findById(id, type = "positive") {
-        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const tableName = getTableName(type);
         const row = init_12.db.prepare(`SELECT * FROM ${tableName} WHERE id = ?`).get(id);
         return row || null;
       }
       static async findByName(groupName, type = "positive") {
-        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const tableName = getTableName(type);
         const row = init_12.db.prepare(`SELECT * FROM ${tableName} WHERE group_name = ?`).get(groupName);
         return row || null;
       }
       static async update(id, data, type = "positive") {
-        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const tableName = getTableName(type);
         const cleanData = {
           ...data,
           is_visible: data.is_visible !== void 0 ? data.is_visible ? 1 : 0 : void 0
@@ -58402,19 +58592,19 @@ var require_PromptGroup = __commonJS({
         return info.changes > 0;
       }
       static async delete(id, type = "positive") {
-        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const tableName = getTableName(type);
         const info = init_12.db.prepare(`DELETE FROM ${tableName} WHERE id = ?`).run(id);
         return info.changes > 0;
       }
       static async reassignGroupIds(groupData, type = "positive") {
-        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+        const tableName = getTableName(type);
         const reassignments = [];
         const existingGroups = await this.findAll(true, type);
         init_12.db.prepare(`CREATE TEMPORARY TABLE temp_${tableName} AS SELECT * FROM ${tableName}`).run();
         init_12.db.prepare(`DELETE FROM ${tableName}`).run();
         for (const group of groupData) {
-          const info = init_12.db.prepare(`INSERT INTO ${tableName} (group_name, display_order, is_visible, created_at, updated_at)
-           VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`).run(group.group_name, group.display_order, group.is_visible ? 1 : 0);
+          const info = init_12.db.prepare(`INSERT INTO ${tableName} (group_name, display_order, is_visible, parent_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`).run(group.group_name, group.display_order, group.is_visible ? 1 : 0, group.parent_id || null);
           const newId = info.lastInsertRowid;
           if (group.id) {
             reassignments.push({
@@ -58427,8 +58617,8 @@ var require_PromptGroup = __commonJS({
         const jsonGroupNames = new Set(groupData.map((g) => g.group_name));
         const existingNonDuplicate = existingGroups.filter((g) => !jsonGroupNames.has(g.group_name));
         for (const existingGroup of existingNonDuplicate) {
-          const info = init_12.db.prepare(`INSERT INTO ${tableName} (group_name, display_order, is_visible, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?)`).run(existingGroup.group_name, existingGroup.display_order, existingGroup.is_visible ? 1 : 0, existingGroup.created_at, existingGroup.updated_at);
+          const info = init_12.db.prepare(`INSERT INTO ${tableName} (group_name, display_order, is_visible, parent_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)`).run(existingGroup.group_name, existingGroup.display_order, existingGroup.is_visible ? 1 : 0, existingGroup.parent_id || null, existingGroup.created_at, existingGroup.updated_at);
           const newId = info.lastInsertRowid;
           reassignments.push({
             old_id: existingGroup.id,
@@ -58440,8 +58630,8 @@ var require_PromptGroup = __commonJS({
         return reassignments;
       }
       static async exportForJSON(type = "positive") {
-        const tableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
-        const rows = init_12.db.prepare(`SELECT id, group_name, display_order, is_visible
+        const tableName = getTableName(type);
+        const rows = init_12.db.prepare(`SELECT id, group_name, display_order, is_visible, parent_id
      FROM ${tableName}
      ORDER BY display_order ASC`).all();
         return rows || [];
@@ -58810,9 +59000,9 @@ var init_network = __esm({
   "shared/dist/constants/network.js"() {
     "use strict";
     PORTS = {
-      BACKEND_DEFAULT: 1566,
-      FRONTEND_DEFAULT: 1577,
-      VITE_DEV: 5173
+      BACKEND_DEFAULT: 1666,
+      FRONTEND_DEFAULT: 1677,
+      VITE_DEV: 5555
     };
     TIMEOUTS = {
       SERVER: 6e4,
@@ -58952,9 +59142,16 @@ var require_synonymService = __commonJS({
     var PromptCollection_1 = require_PromptCollection();
     var shared_12 = (init_dist(), __toCommonJS(dist_exports));
     var SynonymService = class {
+      static getTableName(type) {
+        if (type === "positive")
+          return "prompt_collection";
+        if (type === "negative")
+          return "negative_prompt_collection";
+        return "auto_prompt_collection";
+      }
       static async setSynonymsAndMerge(mainPrompt, synonyms, type = "positive") {
         try {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+          const tableName = this.getTableName(type);
           const normalizedMain = (0, shared_12.normalizeSearchTerm)(mainPrompt);
           let mainPromptId;
           const mainRecord = await this.findPromptByNormalizedText(normalizedMain, type);
@@ -58963,6 +59160,8 @@ var require_synonymService = __commonJS({
           } else {
             if (type === "positive") {
               mainPromptId = await PromptCollection_1.PromptCollectionModel.addOrIncrement(normalizedMain);
+            } else if (type === "auto") {
+              mainPromptId = await PromptCollection_1.PromptCollectionModel.addOrIncrementAuto(normalizedMain);
             } else {
               mainPromptId = await PromptCollection_1.PromptCollectionModel.addOrIncrementNegative(normalizedMain);
             }
@@ -58995,12 +59194,12 @@ var require_synonymService = __commonJS({
         }
       }
       static async findPromptByNormalizedText(normalizedText, type) {
-        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const tableName = this.getTableName(type);
         const row = init_12.db.prepare(`SELECT * FROM ${tableName} WHERE prompt = ? COLLATE NOCASE`).get(normalizedText);
         return row || null;
       }
       static async mergeUsageCount(mainPromptId, additionalCount, type) {
-        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const tableName = this.getTableName(type);
         init_12.db.prepare(`UPDATE ${tableName}
        SET usage_count = usage_count + ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`).run(additionalCount, mainPromptId);
@@ -59008,7 +59207,7 @@ var require_synonymService = __commonJS({
       static async findInSynonymGroup(searchTerm, type = "positive") {
         try {
           const normalizedSearch = (0, shared_12.normalizeSearchTerm)(searchTerm);
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+          const tableName = this.getTableName(type);
           const directMatch = init_12.db.prepare(`SELECT * FROM ${tableName} WHERE prompt = ? COLLATE NOCASE`).get(normalizedSearch);
           if (directMatch) {
             return directMatch;
@@ -59033,7 +59232,7 @@ var require_synonymService = __commonJS({
       }
       static async removeSynonym(mainPromptId, synonymToRemove, type = "positive") {
         try {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+          const tableName = this.getTableName(type);
           const row = init_12.db.prepare(`SELECT synonyms FROM ${tableName} WHERE id = ?`).get(mainPromptId);
           if (!row || !row.synonyms) {
             return false;
@@ -59056,7 +59255,7 @@ var require_synonymService = __commonJS({
         }
       }
       static async getGroupPrompts(groupId, type = "positive") {
-        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const tableName = this.getTableName(type);
         const rows = init_12.db.prepare(`SELECT * FROM ${tableName} WHERE group_id = ? ORDER BY usage_count DESC`).all(groupId);
         return rows || [];
       }
@@ -59074,6 +59273,28 @@ var require_promptGroupService = __commonJS({
     var PromptGroup_1 = require_PromptGroup();
     var PromptCollection_1 = require_PromptCollection();
     var init_12 = require_init2();
+    var getTableName = (type) => {
+      switch (type) {
+        case "auto":
+          return "auto_prompt_groups";
+        case "negative":
+          return "negative_prompt_groups";
+        case "positive":
+        default:
+          return "prompt_groups";
+      }
+    };
+    var getPromptTableName = (type) => {
+      switch (type) {
+        case "auto":
+          return "auto_prompt_collection";
+        case "negative":
+          return "negative_prompt_collection";
+        case "positive":
+        default:
+          return "prompt_collection";
+      }
+    };
     var PromptGroupService = class {
       static async getAllGroups(includeHidden = false, type = "positive") {
         try {
@@ -59084,6 +59305,7 @@ var require_promptGroupService = __commonJS({
             group_name: "Unclassified",
             display_order: -1,
             is_visible: true,
+            parent_id: null,
             prompt_count: unclassifiedCount,
             created_at: "",
             updated_at: ""
@@ -59188,7 +59410,7 @@ var require_promptGroupService = __commonJS({
         }
       }
       static async updatePromptGroupIds(oldGroupId, newGroupId, type = "positive") {
-        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const tableName = getPromptTableName(type);
         let query;
         let params;
         if (oldGroupId === null) {
@@ -59202,13 +59424,13 @@ var require_promptGroupService = __commonJS({
         return info.changes;
       }
       static async getUnclassifiedPromptCount(type = "positive") {
-        const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+        const tableName = getPromptTableName(type);
         const row = init_12.db.prepare(`SELECT COUNT(*) as count FROM ${tableName} WHERE group_id IS NULL`).get();
         return row.count || 0;
       }
       static async getPromptsInGroup(groupId, type = "positive", page = 1, limit = 20) {
         try {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
+          const tableName = getPromptTableName(type);
           const offset = (page - 1) * limit;
           let countQuery;
           let countParams;
@@ -59250,10 +59472,10 @@ var require_promptGroupService = __commonJS({
       }
       static async getGroupedPrompts(type = "positive") {
         try {
-          const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
-          const groupTableName = type === "positive" ? "prompt_groups" : "negative_prompt_groups";
+          const tableName = getPromptTableName(type);
+          const groupTableName = getTableName(type);
           const groupQuery = `
-        SELECT id, group_name, display_order, is_visible
+        SELECT id, group_name, display_order, is_visible, parent_id
         FROM ${groupTableName}
         WHERE is_visible = 1
         ORDER BY display_order ASC
@@ -59279,6 +59501,7 @@ var require_promptGroupService = __commonJS({
               group_name: group.group_name,
               display_order: group.display_order,
               is_visible: group.is_visible,
+              parent_id: group.parent_id,
               prompts
             });
           }
@@ -59499,6 +59722,8 @@ var require_promptCollectionService = __commonJS({
             };
           } else if (type === "positive") {
             return await PromptCollection_1.PromptCollectionModel.searchPrompts(normalizedQuery, page, limit, sortBy, sortOrder);
+          } else if (type === "auto") {
+            return await PromptCollection_1.PromptCollectionModel.searchAutoPrompts(normalizedQuery, page, limit, sortBy, sortOrder);
           } else {
             return await PromptCollection_1.PromptCollectionModel.searchNegativePrompts(normalizedQuery, page, limit, sortBy, sortOrder);
           }
@@ -59526,6 +59751,14 @@ var require_promptCollectionService = __commonJS({
           throw error;
         }
       }
+      static async batchAddOrIncrementAuto(prompts) {
+        try {
+          return await PromptCollection_1.PromptCollectionModel.batchAddOrIncrementAuto(prompts);
+        } catch (error) {
+          console.error("Error batch adding auto prompts:", error);
+          throw error;
+        }
+      }
       static async getStatistics() {
         try {
           const [mostUsedPrompts] = await Promise.all([
@@ -59550,11 +59783,21 @@ var require_promptCollectionService = __commonJS({
                   else
                     res(row.count);
                 });
+              }),
+              new Promise((res, rej) => {
+                const { db } = require_init2();
+                db.get("SELECT COUNT(*) as count FROM auto_prompt_collection", (err, row) => {
+                  if (err)
+                    rej(err);
+                  else
+                    res(row.count);
+                });
               })
-            ]).then(([positive, negative]) => {
+            ]).then(([positive, negative, auto]) => {
               resolve({
                 total_prompts: positive,
-                total_negative_prompts: negative
+                total_negative_prompts: negative,
+                total_auto_prompts: auto
               });
             }).catch(reject);
           });
@@ -59562,6 +59805,7 @@ var require_promptCollectionService = __commonJS({
           return {
             total_prompts: totalStats.total_prompts,
             total_negative_prompts: totalStats.total_negative_prompts,
+            total_auto_prompts: totalStats.total_auto_prompts,
             most_used_prompts: mostUsedPrompts,
             recent_prompts: recentPrompts.prompts
           };
@@ -59648,6 +59892,9 @@ var require_promptCollectionService = __commonJS({
           } else if (type === "negative") {
             const result = await PromptCollection_1.PromptCollectionModel.searchNegativePrompts("", 1, limit, "usage_count", "DESC");
             return result.prompts;
+          } else if (type === "auto") {
+            const result = await PromptCollection_1.PromptCollectionModel.searchAutoPrompts("", 1, limit, "usage_count", "DESC");
+            return result.prompts;
           } else {
             const [positive, negative] = await Promise.all([
               PromptCollection_1.PromptCollectionModel.getMostUsedPrompts(limit),
@@ -59717,13 +59964,23 @@ var require_promptCollectionService = __commonJS({
           let created = 0;
           let updated = 0;
           const failed = [];
-          const addMethod = type === "positive" ? PromptCollection_1.PromptCollectionModel.addOrIncrement.bind(PromptCollection_1.PromptCollectionModel) : PromptCollection_1.PromptCollectionModel.addOrIncrementNegative.bind(PromptCollection_1.PromptCollectionModel);
+          let addMethod;
+          let tableName;
+          if (type === "positive") {
+            addMethod = PromptCollection_1.PromptCollectionModel.addOrIncrement.bind(PromptCollection_1.PromptCollectionModel);
+            tableName = "prompt_collection";
+          } else if (type === "auto") {
+            addMethod = PromptCollection_1.PromptCollectionModel.addOrIncrementAuto.bind(PromptCollection_1.PromptCollectionModel);
+            tableName = "auto_prompt_collection";
+          } else {
+            addMethod = PromptCollection_1.PromptCollectionModel.addOrIncrementNegative.bind(PromptCollection_1.PromptCollectionModel);
+            tableName = "negative_prompt_collection";
+          }
           for (const promptText of prompts) {
             const trimmedPrompt = promptText.trim();
             if (!trimmedPrompt)
               continue;
             try {
-              const tableName = type === "positive" ? "prompt_collection" : "negative_prompt_collection";
               const { db } = require_init2();
               const existing = db.prepare(`SELECT id FROM ${tableName} WHERE prompt = ?`).get(trimmedPrompt);
               if (existing) {
@@ -60177,6 +60434,7 @@ var require_imageProcessor = __commonJS({
     var fs_12 = __importDefault2(require("fs"));
     var settingsService_12 = require_settingsService();
     var metadata_1 = require_metadata();
+    var logger_1 = require_logger();
     var ImageProcessor = class _ImageProcessor {
       static normalizeRelativePath(targetPath, basePath) {
         return path_12.default.relative(basePath, targetPath).replace(/\\/g, "/");
@@ -60250,12 +60508,12 @@ var require_imageProcessor = __commonJS({
       }
       static async processImage(file, baseUploadPath) {
         const startTime = Date.now();
-        console.log(`\u23F1\uFE0F [ImageProcessor] Starting image upload: ${file.originalname}`);
+        logger_1.logger.debug(`\u23F1\uFE0F [ImageProcessor] Starting image upload: ${file.originalname}`);
         let tempFilePath;
         try {
           const folderStart = Date.now();
           const folders = await this.createUploadFolders(baseUploadPath);
-          console.log(`\u23F1\uFE0F [ImageProcessor] Folder creation: ${Date.now() - folderStart}ms`);
+          logger_1.logger.debug(`\u23F1\uFE0F [ImageProcessor] Folder creation: ${Date.now() - folderStart}ms`);
           const filename = this.generateUniqueFilename(file.originalname);
           const originalPath = path_12.default.join(folders.targetFolder, filename);
           const copyStart = Date.now();
@@ -60267,13 +60525,13 @@ var require_imageProcessor = __commonJS({
           } else {
             throw new Error("No file data available (neither path nor buffer)");
           }
-          console.log(`\u23F1\uFE0F [ImageProcessor] File copy: ${Date.now() - copyStart}ms`);
+          logger_1.logger.debug(`\u23F1\uFE0F [ImageProcessor] File copy: ${Date.now() - copyStart}ms`);
           const infoStart = Date.now();
           const imageInfo = await this.getImageInfo(originalPath);
-          console.log(`\u23F1\uFE0F [ImageProcessor] Image info extraction: ${Date.now() - infoStart}ms`);
+          logger_1.logger.debug(`\u23F1\uFE0F [ImageProcessor] Image info extraction: ${Date.now() - infoStart}ms`);
           const relativeOriginal = this.normalizeRelativePath(originalPath, baseUploadPath);
           const totalTime = Date.now() - startTime;
-          console.log(`\u23F1\uFE0F [ImageProcessor] \u2705 Total upload time: ${totalTime}ms`);
+          logger_1.logger.debug(`\u23F1\uFE0F [ImageProcessor] \u2705 Total upload time: ${totalTime}ms`);
           return {
             filename,
             originalPath: relativeOriginal,
@@ -60286,7 +60544,7 @@ var require_imageProcessor = __commonJS({
             colorHistogram: void 0
           };
         } catch (error) {
-          console.error(`\u23F1\uFE0F [ImageProcessor] \u274C Failed after ${Date.now() - startTime}ms:`, error);
+          logger_1.logger.error(`\u23F1\uFE0F [ImageProcessor] \u274C Failed after ${Date.now() - startTime}ms:`, error);
           const message = error instanceof Error ? error.message : "Unknown error";
           throw new Error(`Image upload failed: ${message}`);
         } finally {
@@ -60294,7 +60552,7 @@ var require_imageProcessor = __commonJS({
             try {
               await fs_12.default.promises.unlink(tempFilePath);
             } catch (cleanupError) {
-              console.warn("Failed to cleanup temp file:", tempFilePath, cleanupError);
+              logger_1.logger.warn("Failed to cleanup temp file:", tempFilePath, cleanupError);
             }
           }
         }
@@ -60358,7 +60616,7 @@ var require_imageProcessor = __commonJS({
           });
           return imageId;
         } catch (error) {
-          console.error("Failed to process existing image:", error);
+          logger_1.logger.error("Failed to process existing image:", error);
           throw error instanceof Error ? error : new Error("Unknown error occurred while processing existing image");
         }
       }
@@ -61726,6 +61984,7 @@ var require_QueryCacheService = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.QueryCacheService = void 0;
     var LRU = require_lru_cache();
+    var logger_1 = require_logger();
     var QueryCacheService = class {
       static initialize() {
         this.galleryCache = new LRU({
@@ -61741,7 +62000,7 @@ var require_QueryCacheService = __commonJS({
           maxAge: 10 * 60 * 1e3,
           length: (value) => value.length
         });
-        console.log("\u2705 Query cache service initialized");
+        logger_1.logger.info("\u2705 Query cache service initialized");
       }
       static getGalleryCacheKey(page, limit, sortBy, sortOrder) {
         return `gallery:${page}:${limit}:${sortBy}:${sortOrder}`;
@@ -61757,7 +62016,7 @@ var require_QueryCacheService = __commonJS({
           this.stats.gallery.misses++;
           return null;
         } catch (error) {
-          console.warn("\u26A0\uFE0F Gallery cache get error:", error instanceof Error ? error.message : error);
+          logger_1.logger.warn("\u26A0\uFE0F Gallery cache get error:", error instanceof Error ? error.message : error);
           this.stats.gallery.misses++;
           return null;
         }
@@ -61773,9 +62032,9 @@ var require_QueryCacheService = __commonJS({
       static invalidateGalleryCache() {
         try {
           this.galleryCache.reset();
-          console.log("\u{1F5D1}\uFE0F Gallery cache invalidated");
+          logger_1.logger.debug("\u{1F5D1}\uFE0F Gallery cache invalidated");
         } catch (error) {
-          console.warn("\u26A0\uFE0F Gallery cache invalidate error:", error instanceof Error ? error.message : error);
+          logger_1.logger.warn("\u26A0\uFE0F Gallery cache invalidate error:", error instanceof Error ? error.message : error);
         }
       }
       static getMetadataCache(compositeHash) {
@@ -61848,7 +62107,7 @@ var require_QueryCacheService = __commonJS({
             this.invalidateGalleryCache();
             this.metadataCache.reset();
             this.thumbnailCache.reset();
-            console.log("\u{1F5D1}\uFE0F All image caches invalidated (bulk operation)");
+            logger_1.logger.debug("\u{1F5D1}\uFE0F All image caches invalidated (bulk operation)");
           } else {
             const commonPageSizes = [25, 50, 100];
             const sortOptions = [
@@ -61863,10 +62122,10 @@ var require_QueryCacheService = __commonJS({
             });
             this.invalidateMetadataCache(compositeHash);
             this.invalidateThumbnailCache(compositeHash);
-            console.log(`\u{1F504} First page cache invalidated for image: ${compositeHash}`);
+            logger_1.logger.debug(`\u{1F504} First page cache invalidated for image: ${compositeHash}`);
           }
         } catch (error) {
-          console.warn("\u26A0\uFE0F Image cache invalidate error:", error instanceof Error ? error.message : error);
+          logger_1.logger.warn("\u26A0\uFE0F Image cache invalidate error:", error instanceof Error ? error.message : error);
         }
       }
       static getStats() {
@@ -61919,6 +62178,54 @@ var require_QueryCacheService = __commonJS({
   }
 });
 
+// backend/dist/utils/thumbnailGenerator.js
+var require_thumbnailGenerator = __commonJS({
+  "backend/dist/utils/thumbnailGenerator.js"(exports2) {
+    "use strict";
+    var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
+      return mod && mod.__esModule ? mod : { "default": mod };
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.ThumbnailGenerator = void 0;
+    var fs_12 = __importDefault2(require("fs"));
+    var path_12 = __importDefault2(require("path"));
+    var runtimePaths_12 = require_runtimePaths();
+    var imageProcessor_1 = require_imageProcessor();
+    var ThumbnailGenerator = class {
+      static async generateThumbnail(inputPath, compositeHash) {
+        const dateStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+        const tempDir2 = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, "thumbnails", dateStr);
+        await fs_12.default.promises.mkdir(tempDir2, { recursive: true });
+        const thumbnailPath = path_12.default.join("thumbnails", dateStr, `${compositeHash}.webp`);
+        const absoluteThumbnailPath = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, thumbnailPath);
+        if (fs_12.default.existsSync(absoluteThumbnailPath)) {
+          return thumbnailPath;
+        }
+        await imageProcessor_1.ImageProcessor.generateThumbnail(inputPath, absoluteThumbnailPath);
+        return thumbnailPath;
+      }
+      static async deleteThumbnail(thumbnailPath) {
+        try {
+          const absolutePath = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, thumbnailPath);
+          if (fs_12.default.existsSync(absolutePath)) {
+            await fs_12.default.promises.unlink(absolutePath);
+            return true;
+          }
+          return false;
+        } catch (error) {
+          console.error(`Failed to delete thumbnail: ${thumbnailPath}`, error);
+          return false;
+        }
+      }
+      static thumbnailExists(thumbnailPath) {
+        const absolutePath = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, thumbnailPath);
+        return fs_12.default.existsSync(absolutePath);
+      }
+    };
+    exports2.ThumbnailGenerator = ThumbnailGenerator;
+  }
+});
+
 // backend/dist/routes/images/query.routes.js
 var require_query_routes = __commonJS({
   "backend/dist/routes/images/query.routes.js"(exports2) {
@@ -61939,6 +62246,8 @@ var require_query_routes = __commonJS({
     var runtimePaths_12 = require_runtimePaths();
     var utils_1 = require_utils4();
     var QueryCacheService_12 = require_QueryCacheService();
+    var thumbnailGenerator_1 = require_thumbnailGenerator();
+    var logger_1 = require_logger();
     var router = (0, express_12.Router)();
     exports2.queryRoutes = router;
     var UPLOAD_BASE_PATH = runtimePaths_12.runtimePaths.uploadsDir;
@@ -61963,17 +62272,17 @@ var require_query_routes = __commonJS({
           sortBy,
           sortOrder
         });
-        console.log("\u{1F50D} [QueryRoutes] Query result - first 3 records:");
+        logger_1.logger.debug("\u{1F50D} [QueryRoutes] Query result - first 3 records:");
         result.items.slice(0, 3).forEach((item, idx) => {
-          console.log(`  [${idx}] file_id=${item.id}, hash=${item.composite_hash?.substring(0, 8)}, path=${item.original_file_path}`);
+          logger_1.logger.debug(`  [${idx}] file_id=${item.id}, hash=${item.composite_hash?.substring(0, 8)}, path=${item.original_file_path}`);
         });
         const enrichedImages = result.items.map(utils_1.enrichImageWithFileView);
-        console.log("\u{1F50D} [QueryRoutes] Enriched result - first 3 records:");
+        logger_1.logger.debug("\u{1F50D} [QueryRoutes] Enriched result - first 3 records:");
         enrichedImages.slice(0, 3).forEach((item, idx) => {
-          console.log(`  [${idx}] file_id=${item.id}, hash=${item.composite_hash?.substring(0, 8)}, path=${item.original_file_path}`);
+          logger_1.logger.debug(`  [${idx}] file_id=${item.id}, hash=${item.composite_hash?.substring(0, 8)}, path=${item.original_file_path}`);
         });
         if (enrichedImages.length > 0) {
-          console.log("[QueryRoutes] Sample image rating_score:", {
+          logger_1.logger.debug("[QueryRoutes] Sample image rating_score:", {
             composite_hash: enrichedImages[0].composite_hash,
             rating_score: enrichedImages[0].rating_score,
             has_rating_score: "rating_score" in enrichedImages[0]
@@ -62303,6 +62612,8 @@ var require_query_routes = __commonJS({
         }
         const originalPath = (0, runtimePaths_12.resolveUploadsPath)(files[0].original_file_path);
         if (!fs_12.default.existsSync(originalPath)) {
+          console.warn(`[ImageServe] File missing on disk during raw file access: ${originalPath}`);
+          ImageFileModel_1.ImageFileModel.updateStatus(files[0].id, "missing");
           return res.status(404).json({
             success: false,
             error: "File not found on disk"
@@ -62387,6 +62698,8 @@ var require_query_routes = __commonJS({
         if (mimeType && mimeType.startsWith("video/")) {
           const originalPath = (0, runtimePaths_12.resolveUploadsPath)(files[0].original_file_path);
           if (!fs_12.default.existsSync(originalPath)) {
+            console.warn(`[ImageServe] Video file missing on disk: ${originalPath}`);
+            ImageFileModel_1.ImageFileModel.updateStatus(files[0].id, "missing");
             return res.status(404).json({
               success: false,
               error: "Video file not found"
@@ -62421,13 +62734,37 @@ var require_query_routes = __commonJS({
           }
           return;
         }
-        const thumbnailPath = metadata.thumbnail_path ? path_12.default.join(runtimePaths_12.runtimePaths.tempDir, metadata.thumbnail_path) : null;
+        let thumbnailPath = metadata.thumbnail_path ? path_12.default.join(runtimePaths_12.runtimePaths.tempDir, metadata.thumbnail_path) : null;
+        let serveOriginal = false;
         if (!thumbnailPath || !fs_12.default.existsSync(thumbnailPath)) {
+          const originalPath = (0, runtimePaths_12.resolveUploadsPath)(files[0].original_file_path);
+          if (!fs_12.default.existsSync(originalPath)) {
+            console.warn(`[ImageServe] Both thumbnail and original missing: ${files[0].original_file_path}`);
+            ImageFileModel_1.ImageFileModel.updateStatus(files[0].id, "missing");
+            return res.status(404).json({
+              success: false,
+              error: "Thumbnail and original file not found"
+            });
+          }
+          try {
+            console.log(`[ImageServe] Regenerating missing thumbnail for ${compositeHash}`);
+            const relativeThumbPath = await thumbnailGenerator_1.ThumbnailGenerator.generateThumbnail(originalPath, compositeHash);
+            MediaMetadataModel_1.MediaMetadataModel.update(compositeHash, { thumbnail_path: relativeThumbPath });
+            thumbnailPath = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, relativeThumbPath);
+            if (!fs_12.default.existsSync(thumbnailPath)) {
+              serveOriginal = true;
+            }
+          } catch (err) {
+            console.error(`[ImageServe] Failed to regenerate thumbnail: ${err}`);
+            serveOriginal = true;
+          }
+        }
+        if (serveOriginal) {
           const originalPath = (0, runtimePaths_12.resolveUploadsPath)(files[0].original_file_path);
           if (!fs_12.default.existsSync(originalPath)) {
             return res.status(404).json({
               success: false,
-              error: "Thumbnail and original file not found"
+              error: "Original file not found"
             });
           }
           const stats2 = await fs_12.default.promises.stat(originalPath);
@@ -62441,6 +62778,9 @@ var require_query_routes = __commonJS({
           const fileStream2 = fs_12.default.createReadStream(originalPath);
           fileStream2.pipe(res);
           return;
+        }
+        if (!thumbnailPath) {
+          return res.status(404).json({ success: false, error: "Thumbnail path error" });
         }
         const stats = await fs_12.default.promises.stat(thumbnailPath);
         const etag = generateETag(stats);
@@ -62799,17 +63139,11 @@ var require_taggerDaemon = __commonJS({
             }
           }
           this.lastUsedAt = /* @__PURE__ */ new Date();
-          console.log("[TaggerDaemon] Sending tag command for:", imagePath);
           const response = await this.sendCommand({
             action: "tag_image",
             image_path: imagePath,
             gen_threshold: settings.tagger.generalThreshold,
             char_threshold: settings.tagger.characterThreshold
-          });
-          console.log("[TaggerDaemon] Tag command response:", {
-            success: response.success,
-            hasError: !!response.error,
-            errorType: response.error_type
           });
           this.resetAutoUnloadTimer();
           return response;
@@ -62873,7 +63207,6 @@ var require_taggerDaemon = __commonJS({
         }
         if (settings.tagger.autoUnloadMinutes > 0) {
           const timeoutMs = settings.tagger.autoUnloadMinutes * 60 * 1e3;
-          console.log(`[TaggerDaemon] Setting auto-unload timer for ${settings.tagger.autoUnloadMinutes} minutes`);
           this.autoUnloadTimer = setTimeout(async () => {
             console.log("[TaggerDaemon] Auto-unload timer triggered");
             try {
@@ -63158,17 +63491,18 @@ var require_imageTaggerService = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.imageTaggerService = exports2.ImageTaggerService = void 0;
     var taggerDaemon_1 = require_taggerDaemon();
+    var logger_1 = require_logger();
     var videoFrameExtractor_1 = require_videoFrameExtractor();
     var tagMergeService_1 = require_tagMergeService();
     var ImageTaggerService = class {
       async tagImage(imagePath) {
         try {
-          console.log(`[ImageTagger] Tagging image via daemon: ${imagePath}`);
+          logger_1.logger.debug(`[ImageTagger] Tagging image via daemon: ${imagePath}`);
           const result = await taggerDaemon_1.taggerDaemon.tagImage(imagePath);
           if (result.success) {
-            console.log("[ImageTagger] Tagging succeeded");
+            logger_1.logger.debug("[ImageTagger] Tagging succeeded");
           } else {
-            console.error("[ImageTagger] Tagging failed:", {
+            logger_1.logger.error("[ImageTagger] Tagging failed:", {
               error: result.error,
               error_type: result.error_type
             });
@@ -63177,9 +63511,9 @@ var require_imageTaggerService = __commonJS({
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unknown error";
           const stack = error instanceof Error ? error.stack : void 0;
-          console.error("[ImageTagger] Tagging exception:", message);
+          logger_1.logger.error("[ImageTagger] Tagging exception:", message);
           if (stack)
-            console.error("[ImageTagger] Stack:", stack);
+            logger_1.logger.error("[ImageTagger] Stack:", stack);
           return {
             success: false,
             error: message,
@@ -63190,24 +63524,24 @@ var require_imageTaggerService = __commonJS({
       async tagVideo(videoPath) {
         let framePaths = [];
         try {
-          console.log(`[ImageTagger] Tagging video: ${videoPath}`);
-          console.log("[ImageTagger] Extracting frames from video...");
+          logger_1.logger.debug(`[ImageTagger] Tagging video: ${videoPath}`);
+          logger_1.logger.debug("[ImageTagger] Extracting frames from video...");
           framePaths = await videoFrameExtractor_1.VideoFrameExtractor.extractFramesForTagging(videoPath);
-          console.log(`[ImageTagger] Extracted ${framePaths.length} frames`);
-          console.log("[ImageTagger] Tagging extracted frames...");
+          logger_1.logger.debug(`[ImageTagger] Extracted ${framePaths.length} frames`);
+          logger_1.logger.debug("[ImageTagger] Tagging extracted frames...");
           const frameResults = [];
           for (let i = 0; i < framePaths.length; i++) {
             const framePath = framePaths[i];
-            console.log(`[ImageTagger] Tagging frame ${i + 1}/${framePaths.length}`);
+            logger_1.logger.debug(`[ImageTagger] Tagging frame ${i + 1}/${framePaths.length}`);
             try {
               const result = await this.tagImage(framePath);
               frameResults.push(result);
               if (!result.success) {
-                console.warn(`[ImageTagger] Frame ${i + 1} tagging failed:`, result.error);
+                logger_1.logger.warn(`[ImageTagger] Frame ${i + 1} tagging failed:`, result.error);
               }
             } catch (error) {
               const message = error instanceof Error ? error.message : "Unknown error";
-              console.error(`[ImageTagger] Frame ${i + 1} tagging exception:`, message);
+              logger_1.logger.error(`[ImageTagger] Frame ${i + 1} tagging exception:`, message);
               frameResults.push({
                 success: false,
                 error: message,
@@ -63215,17 +63549,17 @@ var require_imageTaggerService = __commonJS({
               });
             }
           }
-          console.log("[ImageTagger] Merging frame results...");
+          logger_1.logger.debug("[ImageTagger] Merging frame results...");
           const mergedResult = tagMergeService_1.TagMergeService.mergeVideoTagResults(frameResults);
           const stats = tagMergeService_1.TagMergeService.getMergeStatistics(frameResults);
-          console.log(`[ImageTagger] Video tagging complete: ${stats.successful}/${stats.total} frames successful`);
+          logger_1.logger.debug(`[ImageTagger] Video tagging complete: ${stats.successful}/${stats.total} frames successful`);
           return mergedResult;
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unknown error";
           const stack = error instanceof Error ? error.stack : void 0;
-          console.error("[ImageTagger] Video tagging exception:", message);
+          logger_1.logger.error("[ImageTagger] Video tagging exception:", message);
           if (stack)
-            console.error("[ImageTagger] Stack:", stack);
+            logger_1.logger.error("[ImageTagger] Stack:", stack);
           return {
             success: false,
             error: message,
@@ -63236,21 +63570,21 @@ var require_imageTaggerService = __commonJS({
             try {
               await videoFrameExtractor_1.VideoFrameExtractor.cleanupTempFrames(framePaths);
             } catch (cleanupError) {
-              console.warn("[ImageTagger] Frame cleanup failed (non-critical):", cleanupError);
+              logger_1.logger.warn("[ImageTagger] Frame cleanup failed (non-critical):", cleanupError);
             }
           }
         }
       }
       async tagImageBatch(imagePaths) {
         const results = [];
-        console.log(`[ImageTagger] Batch tagging ${imagePaths.length} images`);
+        logger_1.logger.debug(`[ImageTagger] Batch tagging ${imagePaths.length} images`);
         for (const imagePath of imagePaths) {
           try {
             const result = await this.tagImage(imagePath);
             results.push(result);
           } catch (error) {
             const message = error instanceof Error ? error.message : "Unknown error";
-            console.error(`[ImageTagger] Batch error for ${imagePath}:`, message);
+            logger_1.logger.error(`[ImageTagger] Batch error for ${imagePath}:`, message);
             results.push({
               success: false,
               error: message,
@@ -63269,7 +63603,7 @@ var require_imageTaggerService = __commonJS({
       }
       async checkPythonDependencies() {
         try {
-          console.log("[ImageTagger] Checking Python dependencies via daemon...");
+          logger_1.logger.debug("[ImageTagger] Checking Python dependencies via daemon...");
           await taggerDaemon_1.taggerDaemon.start();
           const status = await taggerDaemon_1.taggerDaemon.getStatus();
           if (status.isRunning) {
@@ -63285,7 +63619,7 @@ var require_imageTaggerService = __commonJS({
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unknown error";
-          console.error("[ImageTagger] Dependency check failed:", message);
+          logger_1.logger.error("[ImageTagger] Dependency check failed:", message);
           return {
             available: false,
             message: `Python dependencies check failed: ${message}`
@@ -63296,27 +63630,27 @@ var require_imageTaggerService = __commonJS({
         return await taggerDaemon_1.taggerDaemon.getStatus();
       }
       async loadModel(model) {
-        console.log("[ImageTagger] Loading model manually:", model || "default");
+        logger_1.logger.info("[ImageTagger] Loading model manually:", model || "default");
         await taggerDaemon_1.taggerDaemon.loadModel(model);
       }
       async unloadModel() {
-        console.log("[ImageTagger] Unloading model manually");
+        logger_1.logger.info("[ImageTagger] Unloading model manually");
         await taggerDaemon_1.taggerDaemon.unloadModel();
       }
       async startDaemon() {
-        console.log("[ImageTagger] Starting daemon");
+        logger_1.logger.info("[ImageTagger] Starting daemon");
         await taggerDaemon_1.taggerDaemon.start();
       }
       async stopDaemon() {
-        console.log("[ImageTagger] Stopping daemon");
+        logger_1.logger.info("[ImageTagger] Stopping daemon");
         await taggerDaemon_1.taggerDaemon.stop();
       }
       async reloadConfig() {
-        console.log("[ImageTagger] Reloading configuration...");
+        logger_1.logger.info("[ImageTagger] Reloading configuration...");
         if (taggerDaemon_1.taggerDaemon.isRunning()) {
           await taggerDaemon_1.taggerDaemon.stop();
         }
-        console.log("[ImageTagger] Configuration reloaded - daemon will restart on next use");
+        logger_1.logger.info("[ImageTagger] Configuration reloaded - daemon will restart on next use");
       }
       static formatForDatabase(result) {
         if (!result.success) {
@@ -63362,23 +63696,26 @@ var require_tagging_routes = __commonJS({
     var autoTagSearchService_1 = require_autoTagSearchService();
     var utils_1 = require_utils4();
     var ratingScoreService_1 = require_ratingScoreService();
+    var logger_1 = require_logger();
+    var QueryCacheService_12 = require_QueryCacheService();
     var router = (0, express_12.Router)();
     exports2.taggingRoutes = router;
     router.post("/:id/tag", (0, errorHandler_12.asyncHandler)(async (req, res) => {
       const compositeHash = req.params.id;
       console.log("[TagRoute] POST /:id/tag hit!");
-      console.log("[TagRoute] req.params.id:", compositeHash);
-      console.log("[TagRoute] req.url:", req.url);
-      console.log("[TagRoute] req.path:", req.path);
+      logger_1.logger.debug("[TagRoute] POST /:id/tag hit!");
+      logger_1.logger.debug(`[TagRoute] req.params.id: ${compositeHash}`);
+      logger_1.logger.debug(`[TagRoute] req.url: ${req.url}`);
+      logger_1.logger.debug(`[TagRoute] req.path: ${req.path}`);
       if (!compositeHash || typeof compositeHash !== "string") {
-        console.log("[TagRoute] Invalid composite hash:", compositeHash);
+        logger_1.logger.debug(`[TagRoute] Invalid composite hash: ${compositeHash}`);
         return res.status(400).json({
           success: false,
           error: "Invalid composite hash"
         });
       }
       try {
-        console.log("[TagRoute] Querying database for composite_hash:", compositeHash);
+        logger_1.logger.debug(`[TagRoute] Querying database for composite_hash: ${compositeHash}`);
         const imageData = init_12.db.prepare(`
       SELECT
         mm.*,
@@ -63390,13 +63727,13 @@ var require_tagging_routes = __commonJS({
       LIMIT 1
     `).get(compositeHash);
         if (!imageData) {
-          console.log("[TagRoute] Media not found in database");
+          logger_1.logger.debug("[TagRoute] Media not found in database");
           return res.status(404).json({
             success: false,
             error: "Image or video not found"
           });
         }
-        console.log("[TagRoute] Image data retrieved, file_path:", imageData.original_file_path);
+        logger_1.logger.debug(`[TagRoute] Image data retrieved, file_path: ${imageData.original_file_path}`);
         if (!imageData.original_file_path) {
           return res.status(404).json({
             success: false,
@@ -63404,26 +63741,27 @@ var require_tagging_routes = __commonJS({
           });
         }
         const imagePath = (0, runtimePaths_12.resolveUploadsPath)(imageData.original_file_path);
-        console.log("[TagRoute] original_file_path from DB:", imageData.original_file_path);
-        console.log("[TagRoute] Calculated imagePath:", imagePath);
-        console.log("[TagRoute] File exists?", fs_12.default.existsSync(imagePath));
+        logger_1.logger.debug(`[TagRoute] original_file_path from DB: ${imageData.original_file_path}`);
+        logger_1.logger.debug(`[TagRoute] Calculated imagePath: ${imagePath}`);
+        logger_1.logger.debug(`[TagRoute] File exists? ${fs_12.default.existsSync(imagePath)}`);
         if (!fs_12.default.existsSync(imagePath)) {
-          console.log("[TagRoute] Image file not found on disk");
+          logger_1.logger.debug("[TagRoute] Image file not found on disk");
           return res.status(404).json({
             success: false,
             error: "Image file not found on disk"
           });
         }
-        console.log(`[ImageTag] Tagging file ${compositeHash}: ${imagePath}`);
+        logger_1.logger.debug(`[ImageTag] Tagging file ${compositeHash}: ${imagePath}`);
         const mimeType = imageData.file_mime_type || imageData.mime_type;
         let taggerResult;
         if (imageTaggerService_12.ImageTaggerService.isVideoFile(imagePath, mimeType)) {
-          console.log("[ImageTag] Detected video file, extracting frames...");
+          logger_1.logger.debug("[ImageTag] Detected video file, extracting frames...");
           taggerResult = await imageTaggerService_12.imageTaggerService.tagVideo(imagePath);
         } else {
           taggerResult = await imageTaggerService_12.imageTaggerService.tagImage(imagePath);
         }
-        console.log("[ImageTag] Tagger result:", {
+        logger_1.logger.debug("[ImageTag] Tagger result details logged to file");
+        logger_1.logger.verbose("[ImageTag] Tagger result:", {
           success: taggerResult.success,
           hasCaption: !!taggerResult.caption,
           hasGeneral: !!taggerResult.general,
@@ -63439,23 +63777,26 @@ var require_tagging_routes = __commonJS({
           });
         }
         const autoTagsJson = imageTaggerService_12.ImageTaggerService.formatForDatabase(taggerResult);
-        console.log("[ImageTag] Formatted JSON length:", autoTagsJson?.length || 0);
-        console.log("[ImageTag] Formatted JSON preview:", autoTagsJson?.substring(0, 100));
+        logger_1.logger.debug(`[ImageTag] Formatted JSON length: ${autoTagsJson?.length || 0}`);
+        if (autoTagsJson) {
+          logger_1.logger.verbose(`[ImageTag] Formatted JSON preview: ${autoTagsJson.substring(0, 100)}`);
+        }
         let ratingScore = 0;
         if (taggerResult.rating) {
           try {
             const scoreResult = await ratingScoreService_1.RatingScoreService.calculateScore(taggerResult.rating);
             ratingScore = scoreResult.score;
-            console.log("[ImageTag] Calculated rating_score:", ratingScore);
+            logger_1.logger.debug(`[ImageTag] Calculated rating_score: ${ratingScore}`);
           } catch (error) {
-            console.error("[ImageTag] Failed to calculate rating_score:", error);
+            logger_1.logger.error("[ImageTag] Failed to calculate rating_score:", error);
           }
         }
         MediaMetadataModel_1.MediaMetadataModel.update(compositeHash, {
           auto_tags: autoTagsJson,
           rating_score: ratingScore
         });
-        console.log(`[ImageTag] Successfully tagged ${compositeHash}`);
+        logger_1.logger.info(`[ImageTag] Successfully tagged ${compositeHash}`);
+        QueryCacheService_12.QueryCacheService.invalidateImageCache(compositeHash, false);
         res.json({
           success: true,
           data: {
@@ -63465,7 +63806,7 @@ var require_tagging_routes = __commonJS({
         });
         return;
       } catch (error) {
-        console.error("[ImageTag] Error:", error);
+        logger_1.logger.error("[ImageTag] Error:", error);
         res.status(500).json({
           success: false,
           error: error instanceof Error ? error.message : "Failed to tag image"
@@ -63482,10 +63823,10 @@ var require_tagging_routes = __commonJS({
         });
       }
       try {
-        const results = [];
         let successCount = 0;
         let failCount = 0;
-        console.log(`[BatchTag] Starting batch tagging for ${image_ids.length} images`);
+        logger_1.logger.debug(`[BatchTag] Starting batch tagging for ${image_ids.length} images`);
+        const results = [];
         for (const compositeHash of image_ids) {
           try {
             const imageData = init_12.db.prepare(`
@@ -63549,7 +63890,7 @@ var require_tagging_routes = __commonJS({
                 const scoreResult = await ratingScoreService_1.RatingScoreService.calculateScore(taggerResult.rating);
                 ratingScore = scoreResult.score;
               } catch (error) {
-                console.error("[BatchTag] Failed to calculate rating_score:", error);
+                logger_1.logger.error("[BatchTag] Failed to calculate rating_score:", error);
               }
             }
             MediaMetadataModel_1.MediaMetadataModel.update(compositeHash, {
@@ -63562,7 +63903,7 @@ var require_tagging_routes = __commonJS({
               auto_tags: autoTagsJson ? JSON.parse(autoTagsJson) : null
             });
             successCount++;
-            console.log(`[BatchTag] Tagged image ${compositeHash} (${successCount}/${image_ids.length})`);
+            logger_1.logger.debug(`[BatchTag] Tagged image ${compositeHash} (${successCount}/${image_ids.length})`);
           } catch (error) {
             const message = error instanceof Error ? error.message : "Unknown error";
             results.push({
@@ -63573,7 +63914,8 @@ var require_tagging_routes = __commonJS({
             failCount++;
           }
         }
-        console.log(`[BatchTag] Completed: ${successCount} success, ${failCount} failed`);
+        logger_1.logger.info(`[BatchTag] Completed: ${successCount} success, ${failCount} failed`);
+        QueryCacheService_12.QueryCacheService.invalidateImageCache(void 0, true);
         res.json({
           success: true,
           data: {
@@ -63585,7 +63927,7 @@ var require_tagging_routes = __commonJS({
         });
         return;
       } catch (error) {
-        console.error("[BatchTag] Error:", error);
+        logger_1.logger.error("[BatchTag] Error:", error);
         res.status(500).json({
           success: false,
           error: error instanceof Error ? error.message : "Failed to batch tag images"
@@ -63611,7 +63953,7 @@ var require_tagging_routes = __commonJS({
           });
           return;
         }
-        console.log(`[BatchTagUnprocessed] Processing ${untaggedImages.length} untagged images`);
+        logger_1.logger.debug(`[BatchTagUnprocessed] Processing ${untaggedImages.length} untagged images`);
         const results = [];
         let successCount = 0;
         let failCount = 0;
@@ -63661,7 +64003,7 @@ var require_tagging_routes = __commonJS({
                 const scoreResult = await ratingScoreService_1.RatingScoreService.calculateScore(taggerResult.rating);
                 ratingScore = scoreResult.score;
               } catch (error) {
-                console.error("[BatchTagUnprocessed] Failed to calculate rating_score:", error);
+                logger_1.logger.error("[BatchTagUnprocessed] Failed to calculate rating_score:", error);
               }
             }
             MediaMetadataModel_1.MediaMetadataModel.update(compositeHash, {
@@ -63674,7 +64016,7 @@ var require_tagging_routes = __commonJS({
               auto_tags: autoTagsJson ? JSON.parse(autoTagsJson) : null
             });
             successCount++;
-            console.log(`[BatchTagUnprocessed] Tagged file ${compositeHash} (${successCount}/${untaggedImages.length})`);
+            logger_1.logger.debug(`[BatchTagUnprocessed] Tagged file ${compositeHash} (${successCount}/${untaggedImages.length})`);
           } catch (error) {
             const message = error instanceof Error ? error.message : "Unknown error";
             const compositeHash = image.composite_hash || image.id;
@@ -63686,7 +64028,8 @@ var require_tagging_routes = __commonJS({
             failCount++;
           }
         }
-        console.log(`[BatchTagUnprocessed] Completed: ${successCount} success, ${failCount} failed`);
+        logger_1.logger.info(`[BatchTagUnprocessed] Completed: ${successCount} success, ${failCount} failed`);
+        QueryCacheService_12.QueryCacheService.invalidateImageCache(void 0, true);
         res.json({
           success: true,
           data: {
@@ -63698,7 +64041,7 @@ var require_tagging_routes = __commonJS({
         });
         return;
       } catch (error) {
-        console.error("[BatchTagUnprocessed] Error:", error);
+        logger_1.logger.error("[BatchTagUnprocessed] Error:", error);
         res.status(500).json({
           success: false,
           error: error instanceof Error ? error.message : "Failed to batch tag unprocessed images"
@@ -63727,7 +64070,7 @@ var require_tagging_routes = __commonJS({
           });
           return;
         }
-        console.log(`[BatchTagAll] Processing ${compositeHashes.length} images (force=${forceRetag})`);
+        logger_1.logger.debug(`[BatchTagAll] Processing ${compositeHashes.length} images (force=${forceRetag})`);
         const results = [];
         let successCount = 0;
         let failCount = 0;
@@ -63794,7 +64137,7 @@ var require_tagging_routes = __commonJS({
                 const scoreResult = await ratingScoreService_1.RatingScoreService.calculateScore(taggerResult.rating);
                 ratingScore = scoreResult.score;
               } catch (error) {
-                console.error("[BatchTagAll] Failed to calculate rating_score:", error);
+                logger_1.logger.error("[BatchTagAll] Failed to calculate rating_score:", error);
               }
             }
             MediaMetadataModel_1.MediaMetadataModel.update(compositeHash, {
@@ -63807,7 +64150,7 @@ var require_tagging_routes = __commonJS({
               auto_tags: autoTagsJson ? JSON.parse(autoTagsJson) : null
             });
             successCount++;
-            console.log(`[BatchTagAll] Tagged file ${compositeHash} (${successCount}/${compositeHashes.length})`);
+            logger_1.logger.debug(`[BatchTagAll] Tagged file ${compositeHash} (${successCount}/${compositeHashes.length})`);
           } catch (error) {
             const message = error instanceof Error ? error.message : "Unknown error";
             results.push({
@@ -63818,7 +64161,8 @@ var require_tagging_routes = __commonJS({
             failCount++;
           }
         }
-        console.log(`[BatchTagAll] Completed: ${successCount} success, ${failCount} failed`);
+        logger_1.logger.info(`[BatchTagAll] Completed: ${successCount} success, ${failCount} failed`);
+        QueryCacheService_12.QueryCacheService.invalidateImageCache(void 0, true);
         res.json({
           success: true,
           data: {
@@ -63830,12 +64174,36 @@ var require_tagging_routes = __commonJS({
         });
         return;
       } catch (error) {
-        console.error("[BatchTagAll] Error:", error);
+        logger_1.logger.error("[BatchTagAll] Error:", error);
         res.status(500).json({
           success: false,
           error: error instanceof Error ? error.message : "Failed to batch tag all images"
         });
         return;
+      }
+    }));
+    router.post("/reset-auto-tags", (0, errorHandler_12.asyncHandler)(async (req, res) => {
+      try {
+        logger_1.logger.info("[ResetAutoTags] Resetting all auto_tags to NULL");
+        const result = init_12.db.prepare(`
+      UPDATE media_metadata
+      SET auto_tags = NULL
+    `).run();
+        logger_1.logger.info(`[ResetAutoTags] Reset complete. Changes: ${result.changes}`);
+        QueryCacheService_12.QueryCacheService.invalidateImageCache(void 0, true);
+        res.json({
+          success: true,
+          data: {
+            changes: result.changes,
+            message: "All auto tags have been reset. The scheduler will pick them up shortly."
+          }
+        });
+      } catch (error) {
+        logger_1.logger.error("[ResetAutoTags] Error:", error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to reset auto tags"
+        });
       }
     }));
     router.get("/untagged-count", (0, errorHandler_12.asyncHandler)(async (req, res) => {
@@ -63922,7 +64290,7 @@ var require_tagging_routes = __commonJS({
         };
         return res.json(response);
       } catch (error) {
-        console.error("[AutoTagSearch] Error:", error);
+        logger_1.logger.error("[AutoTagSearch] Error:", error);
         res.status(500).json({
           success: false,
           error: error instanceof Error ? error.message : "Failed to search by auto tags"
@@ -63939,7 +64307,7 @@ var require_tagging_routes = __commonJS({
         });
         return;
       } catch (error) {
-        console.error("[AutoTagStats] Error:", error);
+        logger_1.logger.error("[AutoTagStats] Error:", error);
         res.status(500).json({
           success: false,
           error: error instanceof Error ? error.message : "Failed to get auto tag statistics"
@@ -63949,7 +64317,7 @@ var require_tagging_routes = __commonJS({
     }));
     router.post("/recalculate-rating-scores", (0, errorHandler_12.asyncHandler)(async (req, res) => {
       try {
-        console.log("[RecalculateRatingScores] Starting rating score recalculation for all images");
+        logger_1.logger.info("[RecalculateRatingScores] Starting rating score recalculation for all images");
         const imagesWithTags = init_12.db.prepare(`
       SELECT composite_hash, auto_tags
       FROM media_metadata
@@ -64000,12 +64368,12 @@ var require_tagging_routes = __commonJS({
             });
           }
         }
-        console.log(`[RecalculateRatingScores] Completed: ${successCount} success, ${failCount} failed`);
+        logger_1.logger.info(`[RecalculateRatingScores] Completed: ${successCount} updated, ${failCount} errors`);
+        QueryCacheService_12.QueryCacheService.invalidateImageCache(void 0, true);
         res.json({
           success: true,
           data: {
             total: imagesWithTags.length,
-            success_count: successCount,
             fail_count: failCount,
             results
           }
@@ -65471,8 +65839,9 @@ var require_complexFilterService = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.ComplexFilterService = void 0;
     var init_12 = require_init2();
+    var ratingScoreService_1 = require_ratingScoreService();
     var ComplexFilterService = class {
-      static buildComplexQuery(filter, basicParams) {
+      static buildComplexQuery(filter, weights, basicParams) {
         const params = [];
         const ctes = [];
         const basicConditions = [];
@@ -65494,7 +65863,7 @@ var require_complexFilterService = __commonJS({
         }
         const basicWhere = basicConditions.length > 0 ? `WHERE ${basicConditions.join(" AND ")}` : "";
         if (filter.exclude_group && filter.exclude_group.length > 0) {
-          const excludeResult = this.buildGroupQuery(filter.exclude_group, "OR", params);
+          const excludeResult = this.buildGroupQuery(filter.exclude_group, "OR", params, weights);
           ctes.push(`
         excluded AS (
           SELECT DISTINCT im.composite_hash
@@ -65506,7 +65875,7 @@ var require_complexFilterService = __commonJS({
         }
         let hasOrGroup = false;
         if (filter.or_group && filter.or_group.length > 0) {
-          const orResult = this.buildGroupQuery(filter.or_group, "OR", params);
+          const orResult = this.buildGroupQuery(filter.or_group, "OR", params, weights);
           if (orResult.conditions.length > 0) {
             hasOrGroup = true;
             ctes.push(`
@@ -65521,7 +65890,7 @@ var require_complexFilterService = __commonJS({
         }
         let hasAndGroup = false;
         if (filter.and_group && filter.and_group.length > 0) {
-          const andResult = this.buildGroupQuery(filter.and_group, "AND", params);
+          const andResult = this.buildGroupQuery(filter.and_group, "AND", params, weights);
           if (andResult.conditions.length > 0) {
             hasAndGroup = true;
             ctes.push(`
@@ -65560,17 +65929,17 @@ var require_complexFilterService = __commonJS({
         const query = ctes.length > 0 ? `WITH ${ctes.join(", ")} ${selectClause} ${finalWhere}` : `${selectClause} ${finalWhere}`;
         return { query, params };
       }
-      static buildGroupQuery(conditions, operator, params) {
+      static buildGroupQuery(conditions, operator, params, weights) {
         const sqlConditions = [];
         for (const condition of conditions) {
-          const conditionSql = this.buildConditionSQL(condition, params);
+          const conditionSql = this.buildConditionSQL(condition, params, weights);
           if (conditionSql) {
             sqlConditions.push(conditionSql);
           }
         }
         return { conditions: sqlConditions, params };
       }
-      static buildConditionSQL(condition, params) {
+      static buildConditionSQL(condition, params, weights) {
         switch (condition.category) {
           case "basic":
             return this.buildBasicConditionSQL(condition, params);
@@ -65579,7 +65948,7 @@ var require_complexFilterService = __commonJS({
           case "negative_prompt":
             return this.buildPromptConditionSQL(condition, params, true);
           case "auto_tag":
-            return this.buildAutoTagConditionSQL(condition, params);
+            return this.buildAutoTagConditionSQL(condition, params, weights);
           default:
             return null;
         }
@@ -65610,7 +65979,7 @@ var require_complexFilterService = __commonJS({
         }
         return null;
       }
-      static buildAutoTagConditionSQL(condition, params) {
+      static buildAutoTagConditionSQL(condition, params, weights) {
         if (condition.type === "auto_tag_exists") {
           return condition.value === true ? "im.auto_tags IS NOT NULL" : "im.auto_tags IS NULL";
         }
@@ -65642,15 +66011,21 @@ var require_complexFilterService = __commonJS({
           }
           return conditions.length > 0 ? conditions.join(" AND ") : null;
         }
-        if (condition.type === "auto_tag_rating_score") {
+        if (condition.type === "auto_tag_rating_score" && weights) {
           const conditions = [];
+          const scoreExpression = `
+        (ROUND(json_extract(im.auto_tags, '$.rating.general') * 1000) / 1000 * ${weights.general_weight} +
+         ROUND(json_extract(im.auto_tags, '$.rating.sensitive') * 1000) / 1000 * ${weights.sensitive_weight} +
+         ROUND(json_extract(im.auto_tags, '$.rating.questionable') * 1000) / 1000 * ${weights.questionable_weight} +
+         ROUND(json_extract(im.auto_tags, '$.rating.explicit') * 1000) / 1000 * ${weights.explicit_weight})
+      `.trim();
           if (condition.min_score !== void 0) {
             params.push(condition.min_score);
-            conditions.push(`json_extract(im.auto_tags, '$.rating.general') * 100 >= ?`);
+            conditions.push(`${scoreExpression} >= ?`);
           }
           if (condition.max_score !== void 0) {
             params.push(condition.max_score);
-            conditions.push(`json_extract(im.auto_tags, '$.rating.general') * 100 <= ?`);
+            conditions.push(`${scoreExpression} < ?`);
           }
           return conditions.length > 0 ? conditions.join(" AND ") : null;
         }
@@ -65698,6 +66073,37 @@ var require_complexFilterService = __commonJS({
           params.push(condition.value);
           return `json_extract(im.auto_tags, '$.model') = ?`;
         }
+        if (condition.type === "auto_tag_any") {
+          const tag = String(condition.value).toLowerCase();
+          const variants = this.normalizeSearchTerm(tag);
+          const anyConditions = [];
+          for (const variant of variants) {
+            const generalCondition = `EXISTS (
+          SELECT 1 FROM json_each(im.auto_tags, '$.general')
+          WHERE LOWER(key) LIKE ?
+          ${condition.min_score !== void 0 ? " AND value >= ?" : ""}
+          ${condition.max_score !== void 0 ? " AND value <= ?" : ""}
+        )`;
+            const characterCondition = `EXISTS (
+          SELECT 1 FROM json_each(im.auto_tags, '$.character')
+          WHERE LOWER(key) LIKE ?
+          ${condition.min_score !== void 0 ? " AND value >= ?" : ""}
+          ${condition.max_score !== void 0 ? " AND value <= ?" : ""}
+        )`;
+            anyConditions.push(`(${generalCondition} OR ${characterCondition})`);
+            params.push(`%${variant}%`);
+            if (condition.min_score !== void 0)
+              params.push(condition.min_score);
+            if (condition.max_score !== void 0)
+              params.push(condition.max_score);
+            params.push(`%${variant}%`);
+            if (condition.min_score !== void 0)
+              params.push(condition.min_score);
+            if (condition.max_score !== void 0)
+              params.push(condition.max_score);
+          }
+          return anyConditions.length > 0 ? `(${anyConditions.join(" OR ")})` : null;
+        }
         return null;
       }
       static normalizeSearchTerm(term) {
@@ -65723,8 +66129,9 @@ var require_complexFilterService = __commonJS({
       }
       static async executeComplexSearch(filter, basicParams, pagination) {
         const startTime = Date.now();
-        const { query: baseQuery, params } = this.buildComplexQuery(filter, basicParams);
-        const countQuery = baseQuery.replace(/SELECT im\.\*/g, "SELECT COUNT(DISTINCT im.composite_hash) as total");
+        const weights = await ratingScoreService_1.RatingScoreService.getWeights();
+        const { query: baseQuery, params } = this.buildComplexQuery(filter, weights, basicParams);
+        const countQuery = baseQuery.replace(/SELECT\s+im\.\*,[\s\S]+?FROM/i, "SELECT COUNT(DISTINCT im.composite_hash) as total FROM");
         const countRow = init_12.db.prepare(countQuery).get(...params);
         const total = countRow?.total || 0;
         const page = pagination?.page || 1;
@@ -65783,7 +66190,7 @@ var require_complexFilterService = __commonJS({
             if (typeof condition.value !== "boolean") {
               errors.push(`${groupName} group, condition ${index + 1}: value must be boolean for ${condition.type}`);
             }
-          } else if (condition.type === "auto_tag_general" || condition.type === "auto_tag_character" || condition.type === "prompt_contains" || condition.type === "prompt_regex" || condition.type === "negative_prompt_contains" || condition.type === "negative_prompt_regex" || condition.type === "ai_tool" || condition.type === "model_name" || condition.type === "auto_tag_model") {
+          } else if (condition.type === "auto_tag_general" || condition.type === "auto_tag_character" || condition.type === "prompt_contains" || condition.type === "prompt_regex" || condition.type === "negative_prompt_contains" || condition.type === "negative_prompt_regex" || condition.type === "ai_tool" || condition.type === "model_name" || condition.type === "auto_tag_model" || condition.type === "auto_tag_any") {
             if (typeof condition.value !== "string" || condition.value.trim() === "") {
               errors.push(`${groupName} group, condition ${index + 1}: value must be a non-empty string for ${condition.type}`);
             }
@@ -65796,14 +66203,16 @@ var require_complexFilterService = __commonJS({
               errors.push(`${groupName} group, condition ${index + 1}: value is required`);
             }
           }
-          if (condition.min_score !== void 0) {
-            if (condition.min_score < 0 || condition.min_score > 1) {
-              errors.push(`${groupName} group, condition ${index + 1}: min_score must be between 0 and 1`);
+          if (condition.type !== "auto_tag_rating_score") {
+            if (condition.min_score !== void 0) {
+              if (condition.min_score < 0 || condition.min_score > 1) {
+                errors.push(`${groupName} group, condition ${index + 1}: min_score must be between 0 and 1`);
+              }
             }
-          }
-          if (condition.max_score !== void 0) {
-            if (condition.max_score < 0 || condition.max_score > 1) {
-              errors.push(`${groupName} group, condition ${index + 1}: max_score must be between 0 and 1`);
+            if (condition.max_score !== void 0) {
+              if (condition.max_score < 0 || condition.max_score > 1) {
+                errors.push(`${groupName} group, condition ${index + 1}: max_score must be between 0 and 1`);
+              }
             }
           }
           if (condition.min_score !== void 0 && condition.max_score !== void 0) {
@@ -65818,8 +66227,9 @@ var require_complexFilterService = __commonJS({
         return errors;
       }
       static async executeComplexSearchIds(filter, basicParams) {
-        const { query: baseQuery, params } = this.buildComplexQuery(filter, basicParams);
-        const hashesQuery = baseQuery.replace(/SELECT im\.\*/g, "SELECT DISTINCT im.composite_hash");
+        const weights = await ratingScoreService_1.RatingScoreService.getWeights();
+        const { query: baseQuery, params } = this.buildComplexQuery(filter, weights, basicParams);
+        const hashesQuery = baseQuery.replace(/SELECT\s+im\.\*,[\s\S]+?FROM/i, "SELECT DISTINCT im.composite_hash FROM");
         const rows = init_12.db.prepare(hashesQuery).all(...params);
         return rows.map((row) => row.composite_hash);
       }
@@ -66867,6 +67277,7 @@ var require_userSettingsDb = __commonJS({
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       provider_name TEXT NOT NULL UNIQUE,
       display_name TEXT NOT NULL,
+      provider_type TEXT NOT NULL DEFAULT 'general',
       api_key TEXT,
       api_secret TEXT,
       base_url TEXT,
@@ -66900,6 +67311,14 @@ var require_userSettingsDb = __commonJS({
         console.log("  Migrating wildcards: adding include_children column");
         exports2.userSettingsDb.exec("ALTER TABLE wildcards ADD COLUMN include_children INTEGER DEFAULT 0");
       }
+      if (!hasColumn("wildcards", "type")) {
+        console.log("  Migrating wildcards: adding type column");
+        exports2.userSettingsDb.exec("ALTER TABLE wildcards ADD COLUMN type TEXT CHECK(type IN ('wildcard', 'chain')) DEFAULT 'wildcard'");
+      }
+      if (!hasColumn("wildcards", "chain_option")) {
+        console.log("  Migrating wildcards: adding chain_option column");
+        exports2.userSettingsDb.exec("ALTER TABLE wildcards ADD COLUMN chain_option TEXT CHECK(chain_option IN ('replace', 'append')) DEFAULT 'replace'");
+      }
       if (!hasColumn("custom_dropdown_lists", "is_auto_collected")) {
         console.log("  Migrating custom_dropdown_lists: adding is_auto_collected column");
         exports2.userSettingsDb.exec("ALTER TABLE custom_dropdown_lists ADD COLUMN is_auto_collected INTEGER DEFAULT 0");
@@ -66907,6 +67326,10 @@ var require_userSettingsDb = __commonJS({
       if (!hasColumn("custom_dropdown_lists", "source_path")) {
         console.log("  Migrating custom_dropdown_lists: adding source_path column");
         exports2.userSettingsDb.exec("ALTER TABLE custom_dropdown_lists ADD COLUMN source_path TEXT");
+      }
+      if (!hasColumn("external_api_providers", "provider_type")) {
+        console.log("  Migrating external_api_providers: adding provider_type column");
+        exports2.userSettingsDb.exec("ALTER TABLE external_api_providers ADD COLUMN provider_type TEXT NOT NULL DEFAULT 'general'");
       }
       const indexes = [
         "CREATE INDEX IF NOT EXISTS idx_workflows_name ON workflows(name)",
@@ -66926,7 +67349,8 @@ var require_userSettingsDb = __commonJS({
         "CREATE INDEX IF NOT EXISTS idx_custom_dropdown_lists_created_date ON custom_dropdown_lists(created_date)",
         "CREATE INDEX IF NOT EXISTS idx_custom_dropdown_lists_is_auto_collected ON custom_dropdown_lists(is_auto_collected)",
         "CREATE INDEX IF NOT EXISTS idx_external_api_providers_name ON external_api_providers(provider_name)",
-        "CREATE INDEX IF NOT EXISTS idx_external_api_providers_is_enabled ON external_api_providers(is_enabled)"
+        "CREATE INDEX IF NOT EXISTS idx_external_api_providers_is_enabled ON external_api_providers(is_enabled)",
+        "CREATE INDEX IF NOT EXISTS idx_external_api_providers_type ON external_api_providers(provider_type)"
       ];
       indexes.forEach((sql) => exports2.userSettingsDb.exec(sql));
       exports2.userSettingsDb.prepare(`INSERT OR IGNORE INTO user_preferences (key, value) VALUES (?, ?)`).run("language", "en");
@@ -66969,6 +67393,10 @@ var require_userSettingsDb = __commonJS({
           console.log("  \u2705 wildcard_items table migrated successfully");
         } else {
           console.log("  \u2713 No complex migrations needed");
+        }
+        if (!hasColumn("wildcard_items", "weight")) {
+          console.log("  Migrating wildcard_items: adding weight column");
+          exports2.userSettingsDb.exec("ALTER TABLE wildcard_items ADD COLUMN weight REAL DEFAULT 1.0");
         }
         console.log("  \u2705 Schema migration complete");
       } catch (error) {
@@ -67018,10 +67446,483 @@ var require_userSettingsDb = __commonJS({
   }
 });
 
+// backend/dist/services/llmService.js
+var require_llmService = __commonJS({
+  "backend/dist/services/llmService.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.LLMService = exports2.LLM_PROVIDER_PRESETS = void 0;
+    var ExternalApiProvider_1 = require_ExternalApiProvider();
+    exports2.LLM_PROVIDER_PRESETS = {
+      openai: {
+        provider_name: "openai",
+        display_name: "OpenAI (GPT)",
+        default_base_url: "https://api.openai.com/v1",
+        requires_api_key: true,
+        supports_model_list: true,
+        default_models: ["gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4o", "gpt-4o-mini", "o1", "o1-mini", "o1-pro", "o3", "o3-mini", "o4-mini"]
+      },
+      anthropic: {
+        provider_name: "anthropic",
+        display_name: "Anthropic (Claude)",
+        default_base_url: "https://api.anthropic.com/v1",
+        requires_api_key: true,
+        supports_model_list: false,
+        default_models: ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
+      },
+      google: {
+        provider_name: "google",
+        display_name: "Google (Gemini)",
+        default_base_url: "https://generativelanguage.googleapis.com/v1beta",
+        requires_api_key: true,
+        supports_model_list: true,
+        default_models: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro", "gemini-1.5-flash"]
+      },
+      lmstudio: {
+        provider_name: "lmstudio",
+        display_name: "LM Studio",
+        default_base_url: "http://localhost:1234/v1",
+        requires_api_key: false,
+        supports_model_list: true,
+        default_models: []
+      },
+      ollama: {
+        provider_name: "ollama",
+        display_name: "Ollama",
+        default_base_url: "http://localhost:11434",
+        requires_api_key: false,
+        supports_model_list: true,
+        default_models: []
+      }
+    };
+    var LLMService = class {
+      static getPresets() {
+        return Object.values(exports2.LLM_PROVIDER_PRESETS);
+      }
+      static getPreset(providerName) {
+        return exports2.LLM_PROVIDER_PRESETS[providerName] || null;
+      }
+      static async getModels(providerName) {
+        const provider = ExternalApiProvider_1.ExternalApiProvider.findByName(providerName);
+        if (!provider) {
+          return { success: false, error: "Provider not found" };
+        }
+        const apiKey = ExternalApiProvider_1.ExternalApiProvider.getDecryptedKey(providerName);
+        const baseUrl = provider.base_url || exports2.LLM_PROVIDER_PRESETS[providerName]?.default_base_url;
+        if (!baseUrl) {
+          return { success: false, error: "Base URL not configured" };
+        }
+        const preset = exports2.LLM_PROVIDER_PRESETS[providerName];
+        if (preset?.requires_api_key && !apiKey) {
+          return { success: false, error: "API key not configured or provider is disabled" };
+        }
+        try {
+          switch (providerName) {
+            case "openai":
+              return await this.getOpenAIModels(apiKey, baseUrl);
+            case "anthropic":
+              return this.getAnthropicModels();
+            case "google":
+              return await this.getGoogleModels(apiKey, baseUrl);
+            case "lmstudio":
+              return await this.getLMStudioModels(baseUrl);
+            case "ollama":
+              return await this.getOllamaModels(baseUrl);
+            default:
+              return { success: false, error: "Unknown provider" };
+          }
+        } catch (error) {
+          console.error(`Failed to get models for ${providerName}:`, error);
+          return { success: false, error: error.message };
+        }
+      }
+      static async chat(providerName, request) {
+        const provider = ExternalApiProvider_1.ExternalApiProvider.findByName(providerName);
+        if (!provider) {
+          return { success: false, error: "Provider not found" };
+        }
+        const apiKey = ExternalApiProvider_1.ExternalApiProvider.getDecryptedKey(providerName);
+        const config = provider.additional_config;
+        const baseUrl = provider.base_url || exports2.LLM_PROVIDER_PRESETS[providerName]?.default_base_url;
+        if (!baseUrl) {
+          return { success: false, error: "Base URL not configured" };
+        }
+        const preset = exports2.LLM_PROVIDER_PRESETS[providerName];
+        if (preset?.requires_api_key && !apiKey) {
+          return { success: false, error: "API key not configured" };
+        }
+        const model = config?.model;
+        if (!model) {
+          return { success: false, error: "Model not configured" };
+        }
+        try {
+          switch (providerName) {
+            case "openai":
+              return await this.chatOpenAI(apiKey, baseUrl, model, request, config);
+            case "anthropic":
+              return await this.chatAnthropic(apiKey, baseUrl, model, request, config);
+            case "google":
+              return await this.chatGoogle(apiKey, baseUrl, model, request, config);
+            case "lmstudio":
+              return await this.chatOpenAICompatible(baseUrl, model, request, config);
+            case "ollama":
+              return await this.chatOllama(baseUrl, model, request, config);
+            default:
+              return { success: false, error: "Unknown provider" };
+          }
+        } catch (error) {
+          console.error(`Chat request failed for ${providerName}:`, error);
+          return { success: false, error: error.message };
+        }
+      }
+      static async testConnection(providerName) {
+        const provider = ExternalApiProvider_1.ExternalApiProvider.findByName(providerName);
+        if (!provider) {
+          return false;
+        }
+        const apiKey = ExternalApiProvider_1.ExternalApiProvider.getDecryptedKey(providerName);
+        const preset = exports2.LLM_PROVIDER_PRESETS[providerName];
+        if (preset?.requires_api_key && !apiKey) {
+          return false;
+        }
+        const baseUrl = provider.base_url || preset?.default_base_url;
+        if (!baseUrl) {
+          return false;
+        }
+        try {
+          switch (providerName) {
+            case "openai":
+              return await this.testOpenAIConnection(apiKey, baseUrl);
+            case "anthropic":
+              return await this.testAnthropicConnection(apiKey, baseUrl);
+            case "google":
+              return await this.testGoogleConnection(apiKey, baseUrl);
+            case "lmstudio":
+              return await this.testLMStudioConnection(baseUrl);
+            case "ollama":
+              return await this.testOllamaConnection(baseUrl);
+            default:
+              return false;
+          }
+        } catch (error) {
+          console.error(`Connection test failed for ${providerName}:`, error);
+          return false;
+        }
+      }
+      static async getOpenAIModels(apiKey, baseUrl) {
+        const response = await fetch(`${baseUrl}/models`, {
+          headers: {
+            "Authorization": `Bearer ${apiKey}`
+          }
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to fetch models: ${response.statusText}`);
+        }
+        const data = await response.json();
+        const models = data.data.filter((m) => m.id.includes("gpt")).map((m) => ({
+          id: m.id,
+          name: m.id
+        }));
+        return { success: true, models };
+      }
+      static async chatOpenAI(apiKey, baseUrl, model, request, config) {
+        const response = await fetch(`${baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model,
+            messages: request.messages,
+            max_tokens: request.max_tokens || config?.max_tokens || 4096,
+            temperature: request.temperature ?? config?.temperature ?? 1
+          })
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error?.message || response.statusText);
+        }
+        const data = await response.json();
+        return {
+          success: true,
+          content: data.choices[0]?.message?.content || "",
+          usage: data.usage
+        };
+      }
+      static async chatOpenAICompatible(baseUrl, model, request, config) {
+        const response = await fetch(`${baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model,
+            messages: request.messages,
+            max_tokens: request.max_tokens || config?.max_tokens || 4096,
+            temperature: request.temperature ?? config?.temperature ?? 1
+          })
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error?.message || response.statusText);
+        }
+        const data = await response.json();
+        return {
+          success: true,
+          content: data.choices[0]?.message?.content || "",
+          usage: data.usage
+        };
+      }
+      static async testOpenAIConnection(apiKey, baseUrl) {
+        const response = await fetch(`${baseUrl}/models`, {
+          headers: {
+            "Authorization": `Bearer ${apiKey}`
+          }
+        });
+        return response.ok;
+      }
+      static getAnthropicModels() {
+        const models = exports2.LLM_PROVIDER_PRESETS.anthropic.default_models.map((id) => ({
+          id,
+          name: id
+        }));
+        return { success: true, models };
+      }
+      static async chatAnthropic(apiKey, baseUrl, model, request, config) {
+        const systemMessage = request.messages.find((m) => m.role === "system");
+        const otherMessages = request.messages.filter((m) => m.role !== "system");
+        const response = await fetch(`${baseUrl}/messages`, {
+          method: "POST",
+          headers: {
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: request.max_tokens || config?.max_tokens || 4096,
+            temperature: request.temperature ?? config?.temperature ?? 1,
+            system: systemMessage?.content || config?.default_system_prompt,
+            messages: otherMessages.map((m) => ({
+              role: m.role,
+              content: m.content
+            }))
+          })
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error?.message || response.statusText);
+        }
+        const data = await response.json();
+        return {
+          success: true,
+          content: data.content[0]?.text || "",
+          usage: {
+            prompt_tokens: data.usage?.input_tokens || 0,
+            completion_tokens: data.usage?.output_tokens || 0,
+            total_tokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0)
+          }
+        };
+      }
+      static async testAnthropicConnection(apiKey, baseUrl) {
+        const response = await fetch(`${baseUrl}/messages`, {
+          method: "POST",
+          headers: {
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "claude-3-5-haiku-20241022",
+            max_tokens: 1,
+            messages: [{ role: "user", content: "Hi" }]
+          })
+        });
+        return response.ok;
+      }
+      static async getGoogleModels(apiKey, baseUrl) {
+        const response = await fetch(`${baseUrl}/models?key=${apiKey}`);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          const errorMessage = errorData.error?.message || response.statusText;
+          console.error("Google API error:", errorData);
+          throw new Error(`Failed to fetch models: ${errorMessage}`);
+        }
+        const data = await response.json();
+        const models = (data.models || []).filter((m) => m.name?.includes("gemini") && m.supportedGenerationMethods?.includes("generateContent")).map((m) => ({
+          id: m.name.replace("models/", ""),
+          name: m.displayName || m.name.replace("models/", ""),
+          description: m.description
+        }));
+        return { success: true, models };
+      }
+      static async chatGoogle(apiKey, baseUrl, model, request, config) {
+        const systemInstruction = request.messages.find((m) => m.role === "system")?.content || config?.default_system_prompt;
+        const contents = request.messages.filter((m) => m.role !== "system").map((m) => ({
+          role: m.role === "assistant" ? "model" : "user",
+          parts: [{ text: m.content }]
+        }));
+        const response = await fetch(`${baseUrl}/models/${model}:generateContent?key=${apiKey}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : void 0,
+            contents,
+            generationConfig: {
+              maxOutputTokens: request.max_tokens || config?.max_tokens || 4096,
+              temperature: request.temperature ?? config?.temperature ?? 1
+            }
+          })
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error?.message || response.statusText);
+        }
+        const data = await response.json();
+        return {
+          success: true,
+          content: data.candidates?.[0]?.content?.parts?.[0]?.text || "",
+          usage: {
+            prompt_tokens: data.usageMetadata?.promptTokenCount || 0,
+            completion_tokens: data.usageMetadata?.candidatesTokenCount || 0,
+            total_tokens: data.usageMetadata?.totalTokenCount || 0
+          }
+        };
+      }
+      static async testGoogleConnection(apiKey, baseUrl) {
+        const response = await fetch(`${baseUrl}/models?key=${apiKey}`);
+        return response.ok;
+      }
+      static async getLMStudioModels(baseUrl) {
+        try {
+          const response = await fetch(`${baseUrl}/models`);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch models: ${response.statusText}`);
+          }
+          const data = await response.json();
+          const models = data.data.map((m) => ({
+            id: m.id,
+            name: m.id
+          }));
+          return { success: true, models };
+        } catch (error) {
+          return { success: false, error: "LM Studio server not reachable" };
+        }
+      }
+      static async testLMStudioConnection(baseUrl) {
+        try {
+          const response = await fetch(`${baseUrl}/models`);
+          return response.ok;
+        } catch {
+          return false;
+        }
+      }
+      static async getOllamaModels(baseUrl) {
+        try {
+          const response = await fetch(`${baseUrl}/api/tags`);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch models: ${response.statusText}`);
+          }
+          const data = await response.json();
+          const models = (data.models || []).map((m) => ({
+            id: m.name,
+            name: m.name,
+            description: `Size: ${Math.round((m.size || 0) / 1024 / 1024 / 1024 * 10) / 10}GB`
+          }));
+          return { success: true, models };
+        } catch (error) {
+          return { success: false, error: "Ollama server not reachable" };
+        }
+      }
+      static async chatOllama(baseUrl, model, request, config) {
+        const systemMessage = request.messages.find((m) => m.role === "system");
+        const response = await fetch(`${baseUrl}/api/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model,
+            messages: request.messages,
+            stream: false,
+            options: {
+              temperature: request.temperature ?? config?.temperature ?? 1,
+              num_predict: request.max_tokens || config?.max_tokens || 4096
+            }
+          })
+        });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || response.statusText);
+        }
+        const data = await response.json();
+        return {
+          success: true,
+          content: data.message?.content || "",
+          usage: {
+            prompt_tokens: data.prompt_eval_count || 0,
+            completion_tokens: data.eval_count || 0,
+            total_tokens: (data.prompt_eval_count || 0) + (data.eval_count || 0)
+          }
+        };
+      }
+      static async testOllamaConnection(baseUrl) {
+        try {
+          const response = await fetch(`${baseUrl}/api/tags`);
+          return response.ok;
+        } catch {
+          return false;
+        }
+      }
+    };
+    exports2.LLMService = LLMService;
+  }
+});
+
 // backend/dist/services/externalApiService.js
 var require_externalApiService = __commonJS({
   "backend/dist/services/externalApiService.js"(exports2) {
     "use strict";
+    var __createBinding2 = exports2 && exports2.__createBinding || (Object.create ? (function(o, m, k, k2) {
+      if (k2 === void 0) k2 = k;
+      var desc = Object.getOwnPropertyDescriptor(m, k);
+      if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+        desc = { enumerable: true, get: function() {
+          return m[k];
+        } };
+      }
+      Object.defineProperty(o, k2, desc);
+    }) : (function(o, m, k, k2) {
+      if (k2 === void 0) k2 = k;
+      o[k2] = m[k];
+    }));
+    var __setModuleDefault2 = exports2 && exports2.__setModuleDefault || (Object.create ? (function(o, v) {
+      Object.defineProperty(o, "default", { enumerable: true, value: v });
+    }) : function(o, v) {
+      o["default"] = v;
+    });
+    var __importStar2 = exports2 && exports2.__importStar || /* @__PURE__ */ (function() {
+      var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function(o2) {
+          var ar = [];
+          for (var k in o2) if (Object.prototype.hasOwnProperty.call(o2, k)) ar[ar.length] = k;
+          return ar;
+        };
+        return ownKeys(o);
+      };
+      return function(mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) {
+          for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding2(result, mod, k[i]);
+        }
+        __setModuleDefault2(result, mod);
+        return result;
+      };
+    })();
     var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -67090,7 +67991,11 @@ var require_externalApiService = __commonJS({
           return false;
         }
       }
-      static async testConnection(providerName, apiKey) {
+      static async testConnection(providerName, apiKey, providerType) {
+        if (providerType === "llm") {
+          const { LLMService } = await Promise.resolve().then(() => __importStar2(require_llmService()));
+          return LLMService.testConnection(providerName);
+        }
         switch (providerName) {
           case "civitai":
             return this.testCivitaiConnection(apiKey);
@@ -67125,6 +68030,18 @@ var require_ExternalApiProvider = __commonJS({
     `).all();
         return rows.map((row) => this.toResponse(row));
       }
+      static findByType(providerType) {
+        const db = (0, userSettingsDb_12.getUserSettingsDb)();
+        const rows = db.prepare(`
+      SELECT * FROM external_api_providers
+      WHERE provider_type = ?
+      ORDER BY created_at DESC
+    `).all(providerType);
+        return rows.map((row) => this.toResponse(row));
+      }
+      static findAllLLM() {
+        return this.findByType("llm");
+      }
       static findByName(providerName) {
         const db = (0, userSettingsDb_12.getUserSettingsDb)();
         const row = db.prepare(`
@@ -67136,13 +68053,16 @@ var require_ExternalApiProvider = __commonJS({
         }
         return this.toResponse(row);
       }
-      static getDecryptedKey(providerName) {
+      static getDecryptedKey(providerName, requireEnabled = false) {
         const db = (0, userSettingsDb_12.getUserSettingsDb)();
         const row = db.prepare(`
       SELECT api_key, is_enabled FROM external_api_providers
       WHERE provider_name = ?
     `).get(providerName);
-        if (!row || !row.is_enabled || !row.api_key) {
+        if (!row || !row.api_key) {
+          return null;
+        }
+        if (requireEnabled && !row.is_enabled) {
           return null;
         }
         try {
@@ -67183,13 +68103,14 @@ var require_ExternalApiProvider = __commonJS({
       INSERT INTO external_api_providers (
         provider_name,
         display_name,
+        provider_type,
         api_key,
         api_secret,
         base_url,
         additional_config,
         is_enabled
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(input.provider_name, input.display_name, encryptedKey, encryptedSecret, input.base_url || null, additionalConfig, isEnabled);
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(input.provider_name, input.display_name, input.provider_type || "general", encryptedKey, encryptedSecret, input.base_url || null, additionalConfig, isEnabled);
         return result.lastInsertRowid;
       }
       static update(providerName, input) {
@@ -67199,6 +68120,10 @@ var require_ExternalApiProvider = __commonJS({
         if (input.display_name !== void 0) {
           updates.push("display_name = ?");
           values.push(input.display_name);
+        }
+        if (input.provider_type !== void 0) {
+          updates.push("provider_type = ?");
+          values.push(input.provider_type);
         }
         if (input.api_key !== void 0) {
           updates.push("api_key = ?");
@@ -67280,6 +68205,7 @@ var require_ExternalApiProvider = __commonJS({
           id: row.id,
           provider_name: row.provider_name,
           display_name: row.display_name,
+          provider_type: row.provider_type || "general",
           api_key_masked: maskedKey,
           api_secret_masked: maskedSecret,
           base_url: row.base_url,
@@ -67720,6 +68646,7 @@ var require_backgroundQueue = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.BackgroundQueueService = exports2.TaskType = void 0;
     var init_12 = require_init2();
+    var logger_1 = require_logger();
     var metadata_1 = require_metadata();
     var path_12 = __importDefault2(require("path"));
     var QueryCacheService_12 = require_QueryCacheService();
@@ -67748,7 +68675,7 @@ var require_backgroundQueue = __commonJS({
           createdAt: /* @__PURE__ */ new Date()
         };
         this.queue.push(task);
-        console.log(`  \u{1F4CB} \uBC31\uADF8\uB77C\uC6B4\uB4DC \uC791\uC5C5 \uCD94\uAC00: \uBA54\uD0C0\uB370\uC774\uD130 \uCD94\uCD9C - ${path_12.default.basename(filePath)}`);
+        logger_1.logger.debug(`  \u{1F4CB} \uBC31\uADF8\uB77C\uC6B4\uB4DC \uC791\uC5C5 \uCD94\uAC00: \uBA54\uD0C0\uB370\uC774\uD130 \uCD94\uCD9C - ${path_12.default.basename(filePath)}`);
         if (!this.processing) {
           this.processQueue();
         }
@@ -67765,7 +68692,7 @@ var require_backgroundQueue = __commonJS({
           createdAt: /* @__PURE__ */ new Date()
         };
         this.queue.push(task);
-        console.log(`  \u{1F4CB} \uBC31\uADF8\uB77C\uC6B4\uB4DC \uC791\uC5C5 \uCD94\uAC00: \uD504\uB86C\uD504\uD2B8 \uC218\uC9D1 - ${path_12.default.basename(filePath)}`);
+        logger_1.logger.debug(`  \u{1F4CB} \uBC31\uADF8\uB77C\uC6B4\uB4DC \uC791\uC5C5 \uCD94\uAC00: \uD504\uB86C\uD504\uD2B8 \uC218\uC9D1 - ${path_12.default.basename(filePath)}`);
         if (!this.processing) {
           this.processQueue();
         }
@@ -67786,7 +68713,7 @@ var require_backgroundQueue = __commonJS({
           modelReferences: refsWithHash
         };
         this.queue.push(task);
-        console.log(`  \u{1F4CB} \uBC31\uADF8\uB77C\uC6B4\uB4DC \uC791\uC5C5 \uCD94\uAC00: Civitai \uBAA8\uB378 \uC870\uD68C (${refsWithHash.length}\uAC1C)`);
+        logger_1.logger.debug(`  \u{1F4CB} \uBC31\uADF8\uB77C\uC6B4\uB4DC \uC791\uC5C5 \uCD94\uAC00: Civitai \uBAA8\uB378 \uC870\uD68C (${refsWithHash.length}\uAC1C)`);
         if (!this.processing) {
           this.processQueue();
         }
@@ -67796,7 +68723,7 @@ var require_backgroundQueue = __commonJS({
           return;
         }
         this.processing = true;
-        console.log(`
+        logger_1.logger.info(`
 \u{1F504} \uBC31\uADF8\uB77C\uC6B4\uB4DC \uD050 \uCC98\uB9AC \uC2DC\uC791: ${this.queue.length}\uAC1C \uC791\uC5C5`);
         while (this.queue.length > 0) {
           this.queue.sort((a, b) => a.priority - b.priority);
@@ -67807,17 +68734,17 @@ var require_backgroundQueue = __commonJS({
               const task = batch[index];
               task.retries++;
               if (task.retries < task.maxRetries) {
-                console.log(`  \u26A0\uFE0F  \uC791\uC5C5 \uC7AC\uC2DC\uB3C4 (${task.retries}/${task.maxRetries}): ${task.id}`);
+                logger_1.logger.warn(`  \u26A0\uFE0F  \uC791\uC5C5 \uC7AC\uC2DC\uB3C4 (${task.retries}/${task.maxRetries}): ${task.id}`);
                 this.queue.push(task);
               } else {
-                console.error(`  \u274C \uC791\uC5C5 \uCD5C\uC885 \uC2E4\uD328: ${task.id}`, result.reason);
+                logger_1.logger.error(`  \u274C \uC791\uC5C5 \uCD5C\uC885 \uC2E4\uD328: ${task.id}`, result.reason);
               }
             }
           });
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
         this.processing = false;
-        console.log("\u2705 \uBC31\uADF8\uB77C\uC6B4\uB4DC \uD050 \uCC98\uB9AC \uC644\uB8CC\n");
+        logger_1.logger.info("\u2705 \uBC31\uADF8\uB77C\uC6B4\uB4DC \uD050 \uCC98\uB9AC \uC644\uB8CC\n");
       }
       static async processTask(task) {
         try {
@@ -67832,17 +68759,17 @@ var require_backgroundQueue = __commonJS({
               await this.processCivitaiModelLookup(task);
               break;
             default:
-              console.warn(`  \u26A0\uFE0F  \uC54C \uC218 \uC5C6\uB294 \uC791\uC5C5 \uD0C0\uC785: ${task.type}`);
+              logger_1.logger.warn(`  \u26A0\uFE0F  \uC54C \uC218 \uC5C6\uB294 \uC791\uC5C5 \uD0C0\uC785: ${task.type}`);
           }
         } catch (error) {
           if (error instanceof errors_1.MetadataExtractionError) {
             if (!error.retryable) {
-              console.log(`  \u23ED\uFE0F  \uC7AC\uC2DC\uB3C4 \uBD88\uD544\uC694\uD55C \uC624\uB958: ${error.type} - ${error.message}`);
+              logger_1.logger.debug(`  \u23ED\uFE0F  \uC7AC\uC2DC\uB3C4 \uBD88\uD544\uC694\uD55C \uC624\uB958: ${error.type} - ${error.message}`);
               return;
             }
-            console.error(`  \u274C \uC7AC\uC2DC\uB3C4 \uAC00\uB2A5\uD55C \uC624\uB958: ${error.type} - ${error.message}`);
+            logger_1.logger.error(`  \u274C \uC7AC\uC2DC\uB3C4 \uAC00\uB2A5\uD55C \uC624\uB958: ${error.type} - ${error.message}`);
           } else {
-            console.error(`  \u274C \uC791\uC5C5 \uCC98\uB9AC \uC2E4\uD328: ${task.id}`, error);
+            logger_1.logger.error(`  \u274C \uC791\uC5C5 \uCC98\uB9AC \uC2E4\uD328: ${task.id}`, error);
           }
           throw error;
         }
@@ -67851,47 +68778,55 @@ var require_backgroundQueue = __commonJS({
         const aiMetadata = await metadata_1.MetadataExtractor.extractMetadata(task.filePath);
         const aiInfo = aiMetadata.ai_info || {};
         const modelReferencesJson = aiInfo.model_references && aiInfo.model_references.length > 0 ? JSON.stringify(aiInfo.model_references) : null;
-        init_12.db.prepare(`
-      UPDATE media_metadata
-      SET
-        ai_tool = ?,
-        model_name = ?,
-        steps = ?,
-        cfg_scale = ?,
-        sampler = ?,
-        seed = ?,
-        scheduler = ?,
-        prompt = ?,
-        negative_prompt = ?,
-        denoise_strength = ?,
-        generation_time = ?,
-        batch_size = ?,
-        batch_index = ?,
-        model_references = ?
-      WHERE composite_hash = ?
-    `).run(aiInfo.ai_tool || null, aiInfo.model || null, aiInfo.steps || null, aiInfo.cfg_scale || null, aiInfo.sampler || null, aiInfo.seed || null, aiInfo.scheduler || null, aiInfo.prompt || null, aiInfo.negative_prompt || null, aiInfo.denoise_strength || null, aiInfo.generation_time || null, aiInfo.batch_size || null, aiInfo.batch_index || null, modelReferencesJson, task.compositeHash);
-        console.log(`  \u2705 \uBA54\uD0C0\uB370\uC774\uD130 \uCD94\uCD9C \uC644\uB8CC: ${path_12.default.basename(task.filePath)}`);
         try {
-          console.log(`  \u{1F50D} Running auto-collection (after metadata extraction)...`);
+          init_12.db.prepare(`
+        UPDATE media_metadata
+        SET
+          ai_tool = ?,
+          model_name = ?,
+          steps = ?,
+          cfg_scale = ?,
+          sampler = ?,
+          seed = ?,
+          scheduler = ?,
+          prompt = ?,
+          negative_prompt = ?,
+          denoise_strength = ?,
+          generation_time = ?,
+          batch_size = ?,
+          batch_index = ?,
+          model_references = ?
+        WHERE composite_hash = ?
+      `).run(aiInfo.ai_tool || null, aiInfo.model || null, aiInfo.steps || null, aiInfo.cfg_scale || null, aiInfo.sampler || null, aiInfo.seed || null, aiInfo.scheduler || null, aiInfo.prompt || null, aiInfo.negative_prompt || null, aiInfo.denoise_strength || null, aiInfo.generation_time || null, aiInfo.batch_size || null, aiInfo.batch_index || null, modelReferencesJson, task.compositeHash);
+        } catch (error) {
+          if (error instanceof RangeError) {
+            logger_1.logger.error(`  \u274C RangeError during metadata update (skipping): ${path_12.default.basename(task.filePath)}`);
+            return;
+          }
+          throw error;
+        }
+        logger_1.logger.debug(`  \u2705 \uBA54\uD0C0\uB370\uC774\uD130 \uCD94\uCD9C \uC644\uB8CC: ${path_12.default.basename(task.filePath)}`);
+        try {
+          logger_1.logger.debug(`  \u{1F50D} Running auto-collection (after metadata extraction)...`);
           const autoCollectResults = await autoCollectionService_1.AutoCollectionService.runAutoCollectionForNewImage(task.compositeHash);
           if (autoCollectResults.length > 0) {
-            console.log(`  \u2705 Auto-assigned to ${autoCollectResults.length} additional group(s) based on AI metadata`);
+            logger_1.logger.debug(`  \u2705 Auto-assigned to ${autoCollectResults.length} additional group(s) based on AI metadata`);
           }
         } catch (autoCollectError) {
-          console.warn(`  \u26A0\uFE0F  Auto-collection failed (non-critical) for ${path_12.default.basename(task.filePath)}:`, autoCollectError instanceof Error ? autoCollectError.message : autoCollectError);
+          logger_1.logger.warn(`  \u26A0\uFE0F  Auto-collection failed (non-critical) for ${path_12.default.basename(task.filePath)}:`, autoCollectError instanceof Error ? autoCollectError.message : autoCollectError);
         }
         if (aiInfo.prompt) {
           try {
             this.addPromptCollectionTask(task.filePath, task.compositeHash);
           } catch (error) {
-            console.warn(`  \u26A0\uFE0F  \uD504\uB86C\uD504\uD2B8 \uC218\uC9D1 \uC791\uC5C5 \uCD94\uAC00 \uC2E4\uD328: ${path_12.default.basename(task.filePath)}`, error);
+            logger_1.logger.warn(`  \u26A0\uFE0F  \uD504\uB86C\uD504\uD2B8 \uC218\uC9D1 \uC791\uC5C5 \uCD94\uAC00 \uC2E4\uD328: ${path_12.default.basename(task.filePath)}`, error);
           }
         }
         if (aiInfo.model_references && aiInfo.model_references.length > 0) {
           try {
             this.addCivitaiModelLookupTask(task.compositeHash, aiInfo.model_references);
           } catch (error) {
-            console.warn(`  \u26A0\uFE0F  Civitai \uC870\uD68C \uC791\uC5C5 \uCD94\uAC00 \uC2E4\uD328: ${path_12.default.basename(task.filePath)}`, error);
+            logger_1.logger.warn(`  \u26A0\uFE0F  Civitai \uC870\uD68C \uC791\uC5C5 \uCD94\uAC00 \uC2E4\uD328: ${path_12.default.basename(task.filePath)}`, error);
           }
         }
         QueryCacheService_12.QueryCacheService.invalidateGalleryCache();
@@ -67899,16 +68834,16 @@ var require_backgroundQueue = __commonJS({
       static async processPromptCollection(task) {
         const metadata = init_12.db.prepare("SELECT prompt, negative_prompt FROM media_metadata WHERE composite_hash = ?").get(task.compositeHash);
         if (!metadata || !metadata.prompt) {
-          console.log(`  \u23ED\uFE0F  \uD504\uB86C\uD504\uD2B8 \uC5C6\uC74C: ${path_12.default.basename(task.filePath)}`);
+          logger_1.logger.debug(`  \u23ED\uFE0F  \uD504\uB86C\uD504\uD2B8 \uC5C6\uC74C: ${path_12.default.basename(task.filePath)}`);
           return;
         }
         await promptCollectionService_1.PromptCollectionService.collectFromImage(metadata.prompt, metadata.negative_prompt);
-        console.log(`  \u2705 \uD504\uB86C\uD504\uD2B8 \uC218\uC9D1 \uC644\uB8CC: ${path_12.default.basename(task.filePath)}`);
+        logger_1.logger.debug(`  \u2705 \uD504\uB86C\uD504\uD2B8 \uC218\uC9D1 \uC644\uB8CC: ${path_12.default.basename(task.filePath)}`);
       }
       static async processCivitaiModelLookup(task) {
         const settings = CivitaiSettings_1.CivitaiSettings.get();
         if (!settings.enabled) {
-          console.log(`  \u23ED\uFE0F  Civitai \uAE30\uB2A5 \uBE44\uD65C\uC131\uD654`);
+          logger_1.logger.debug(`  \u23ED\uFE0F  Civitai \uAE30\uB2A5 \uBE44\uD65C\uC131\uD654`);
           return;
         }
         if (!task.modelReferences || task.modelReferences.length === 0) {
@@ -67927,12 +68862,12 @@ var require_backgroundQueue = __commonJS({
             await civitaiService_1.CivitaiService.waitForRateLimit();
             const success = await civitaiService_1.CivitaiService.lookupAndCacheModel(ref.hash);
             if (success) {
-              console.log(`  \u2705 Civitai \uBAA8\uB378 \uC815\uBCF4 \uCE90\uC2F1: ${ref.name} (${ref.hash})`);
+              logger_1.logger.debug(`  \u2705 Civitai \uBAA8\uB378 \uC815\uBCF4 \uCE90\uC2F1: ${ref.name} (${ref.hash})`);
             } else {
-              console.log(`  \u23ED\uFE0F  Civitai\uC5D0\uC11C \uBAA8\uB378 \uCC3E\uC9C0 \uBABB\uD568: ${ref.name} (${ref.hash})`);
+              logger_1.logger.debug(`  \u23ED\uFE0F  Civitai\uC5D0\uC11C \uBAA8\uB378 \uCC3E\uC9C0 \uBABB\uD568: ${ref.name} (${ref.hash})`);
             }
           } catch (error) {
-            console.error(`  \u274C Civitai \uC870\uD68C \uC2E4\uD328: ${ref.hash}`, error);
+            logger_1.logger.error(`  \u274C Civitai \uC870\uD68C \uC2E4\uD328: ${ref.hash}`, error);
           }
         }
       }
@@ -67953,7 +68888,7 @@ var require_backgroundQueue = __commonJS({
       }
       static clearQueue() {
         this.queue = [];
-        console.log("\u{1F5D1}\uFE0F  \uBC31\uADF8\uB77C\uC6B4\uB4DC \uD050 \uCD08\uAE30\uD654");
+        logger_1.logger.info("\u{1F5D1}\uFE0F  \uBC31\uADF8\uB77C\uC6B4\uB4DC \uD050 \uCD08\uAE30\uD654");
       }
     };
     exports2.BackgroundQueueService = BackgroundQueueService;
@@ -67964,58 +68899,47 @@ var require_backgroundQueue = __commonJS({
   }
 });
 
-// backend/dist/utils/thumbnailGenerator.js
-var require_thumbnailGenerator = __commonJS({
-  "backend/dist/utils/thumbnailGenerator.js"(exports2) {
-    "use strict";
-    var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
-      return mod && mod.__esModule ? mod : { "default": mod };
-    };
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.ThumbnailGenerator = void 0;
-    var fs_12 = __importDefault2(require("fs"));
-    var path_12 = __importDefault2(require("path"));
-    var runtimePaths_12 = require_runtimePaths();
-    var imageProcessor_1 = require_imageProcessor();
-    var ThumbnailGenerator = class {
-      static async generateThumbnail(inputPath, compositeHash) {
-        const dateStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-        const tempDir2 = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, "thumbnails", dateStr);
-        await fs_12.default.promises.mkdir(tempDir2, { recursive: true });
-        const thumbnailPath = path_12.default.join("thumbnails", dateStr, `${compositeHash}.webp`);
-        const absoluteThumbnailPath = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, thumbnailPath);
-        if (fs_12.default.existsSync(absoluteThumbnailPath)) {
-          return thumbnailPath;
-        }
-        await imageProcessor_1.ImageProcessor.generateThumbnail(inputPath, absoluteThumbnailPath);
-        return thumbnailPath;
-      }
-      static async deleteThumbnail(thumbnailPath) {
-        try {
-          const absolutePath = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, thumbnailPath);
-          if (fs_12.default.existsSync(absolutePath)) {
-            await fs_12.default.promises.unlink(absolutePath);
-            return true;
-          }
-          return false;
-        } catch (error) {
-          console.error(`Failed to delete thumbnail: ${thumbnailPath}`, error);
-          return false;
-        }
-      }
-      static thumbnailExists(thumbnailPath) {
-        const absolutePath = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, thumbnailPath);
-        return fs_12.default.existsSync(absolutePath);
-      }
-    };
-    exports2.ThumbnailGenerator = ThumbnailGenerator;
-  }
-});
-
 // backend/dist/services/backgroundProcessorService.js
 var require_backgroundProcessorService = __commonJS({
   "backend/dist/services/backgroundProcessorService.js"(exports2) {
     "use strict";
+    var __createBinding2 = exports2 && exports2.__createBinding || (Object.create ? (function(o, m, k, k2) {
+      if (k2 === void 0) k2 = k;
+      var desc = Object.getOwnPropertyDescriptor(m, k);
+      if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+        desc = { enumerable: true, get: function() {
+          return m[k];
+        } };
+      }
+      Object.defineProperty(o, k2, desc);
+    }) : (function(o, m, k, k2) {
+      if (k2 === void 0) k2 = k;
+      o[k2] = m[k];
+    }));
+    var __setModuleDefault2 = exports2 && exports2.__setModuleDefault || (Object.create ? (function(o, v) {
+      Object.defineProperty(o, "default", { enumerable: true, value: v });
+    }) : function(o, v) {
+      o["default"] = v;
+    });
+    var __importStar2 = exports2 && exports2.__importStar || /* @__PURE__ */ (function() {
+      var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function(o2) {
+          var ar = [];
+          for (var k in o2) if (Object.prototype.hasOwnProperty.call(o2, k)) ar[ar.length] = k;
+          return ar;
+        };
+        return ownKeys(o);
+      };
+      return function(mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) {
+          for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding2(result, mod, k[i]);
+        }
+        __setModuleDefault2(result, mod);
+        return result;
+      };
+    })();
     var __importDefault2 = exports2 && exports2.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -68136,6 +69060,7 @@ var require_backgroundProcessorService = __commonJS({
         } catch (autoCollectError) {
           console.warn(`  \u26A0\uFE0F  Auto-collection failed (non-critical) for ${fileName}:`, autoCollectError instanceof Error ? autoCollectError.message : autoCollectError);
         }
+        await this.processApiGenerationGroupAssignment(hashes.compositeHash);
         try {
           backgroundQueue_12.BackgroundQueueService.addMetadataExtractionTask(file.original_file_path, hashes.compositeHash);
         } catch (error) {
@@ -68188,6 +69113,7 @@ var require_backgroundProcessorService = __commonJS({
         } catch (autoCollectError) {
           console.warn(`  \u26A0\uFE0F  Auto-collection failed (non-critical) for ${fileName}:`, autoCollectError instanceof Error ? autoCollectError.message : autoCollectError);
         }
+        await this.processApiGenerationGroupAssignment(fileHash);
         console.log(`  \u2728 Processed video/animated: ${fileName} (${width}x${height})`);
       }
       static async generateThumbnail(inputPath, compositeHash) {
@@ -68216,6 +69142,29 @@ var require_backgroundProcessorService = __commonJS({
       static forceStop() {
         this.processing = false;
         console.log("\u23F9\uFE0F  Background processor stopped");
+      }
+      static async processApiGenerationGroupAssignment(compositeHash) {
+        try {
+          const { apiGenDb } = await Promise.resolve().then(() => __importStar2(require_apiGenerationDb()));
+          const { ImageGroupModel } = await Promise.resolve().then(() => __importStar2(require_Group()));
+          const pendingAssignment = apiGenDb.prepare(`
+        SELECT id, assigned_group_id
+        FROM api_generation_history
+        WHERE composite_hash = ?
+          AND assigned_group_id IS NOT NULL
+          AND generation_status = 'completed'
+      `).get(compositeHash);
+          if (pendingAssignment) {
+            const added = await ImageGroupModel.addImageToGroup(pendingAssignment.assigned_group_id, compositeHash, "manual", 0);
+            if (added) {
+              console.log(`  \u{1F4C1} API generation image assigned to group ${pendingAssignment.assigned_group_id}`);
+            } else {
+              console.log(`  \u2139\uFE0F  Image already in group ${pendingAssignment.assigned_group_id}`);
+            }
+          }
+        } catch (error) {
+          console.warn(`  \u26A0\uFE0F  API generation group assignment failed (non-critical):`, error instanceof Error ? error.message : error);
+        }
       }
     };
     exports2.BackgroundProcessorService = BackgroundProcessorService;
@@ -68930,10 +69879,11 @@ var require_images = __commonJS({
     var complex_search_routes_1 = __importDefault2(require_complex_search_routes());
     var metadata_routes_1 = __importDefault2(require_metadata_routes());
     var hash_routes_1 = __importDefault2(require_hash_routes());
+    var logger_1 = require_logger();
     var router = (0, express_12.Router)();
     exports2.imageRoutes = router;
     router.use((req, res, next) => {
-      console.log("[ImageRoutes] Incoming request:", req.method, req.path);
+      logger_1.logger.debug("[ImageRoutes] Incoming request:", req.method, req.path);
       next();
     });
     router.use("/", upload_routes_1.uploadRoutes);
@@ -69176,6 +70126,23 @@ var require_promptGroups = __commonJS({
         return res.status(500).json(response);
       }
     });
+    router.get("/export", async (req, res) => {
+      try {
+        const { type = "positive" } = req.query;
+        const exportData = await promptGroupService_1.PromptGroupService.exportToJSON(type);
+        const filename = `prompt_groups_${type}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.json`;
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.setHeader("Content-Type", "application/json");
+        return res.json(exportData);
+      } catch (error) {
+        console.error("Error exporting groups:", error);
+        const response = {
+          success: false,
+          error: "Failed to export groups"
+        };
+        return res.status(500).json(response);
+      }
+    });
     router.get("/", async (req, res) => {
       try {
         const { include_hidden = "false", type = "positive" } = req.query;
@@ -69190,6 +70157,63 @@ var require_promptGroups = __commonJS({
         const response = {
           success: false,
           error: "Failed to get groups"
+        };
+        return res.status(500).json(response);
+      }
+    });
+    router.put("/reorder", async (req, res) => {
+      try {
+        const { group_orders, type = "positive" } = req.body;
+        if (!Array.isArray(group_orders)) {
+          const response2 = {
+            success: false,
+            error: "group_orders must be an array"
+          };
+          return res.status(400).json(response2);
+        }
+        const updatedCount = await promptGroupService_1.PromptGroupService.updateGroupOrders(group_orders, type);
+        const response = {
+          success: true,
+          data: {
+            updated_count: updatedCount,
+            message: `Successfully updated ${updatedCount} group orders`
+          }
+        };
+        return res.json(response);
+      } catch (error) {
+        console.error("Error updating group orders:", error);
+        const response = {
+          success: false,
+          error: "Failed to update group orders"
+        };
+        return res.status(500).json(response);
+      }
+    });
+    router.put("/move-prompt", async (req, res) => {
+      try {
+        const { prompt_id, target_group_id, type = "positive" } = req.body;
+        if (prompt_id === void 0 || prompt_id === null) {
+          const response2 = {
+            success: false,
+            error: "prompt_id is required"
+          };
+          return res.status(400).json(response2);
+        }
+        const result = await promptGroupService_1.PromptGroupService.movePromptToGroup(Number(prompt_id), target_group_id ? Number(target_group_id) : null, type);
+        const success = result;
+        const response = {
+          success: true,
+          data: {
+            moved: success,
+            message: success ? "Prompt moved successfully" : "Prompt not found"
+          }
+        };
+        return res.json(response);
+      } catch (error) {
+        console.error("Error moving prompt:", error);
+        const response = {
+          success: false,
+          error: "Failed to move prompt"
         };
         return res.status(500).json(response);
       }
@@ -69265,7 +70289,7 @@ var require_promptGroups = __commonJS({
     });
     router.post("/", async (req, res) => {
       try {
-        const { group_name, display_order, is_visible, type = "positive" } = req.body;
+        const { group_name, display_order, is_visible, parent_id, type = "positive" } = req.body;
         if (!group_name) {
           const response2 = {
             success: false,
@@ -69276,7 +70300,8 @@ var require_promptGroups = __commonJS({
         const groupId = await promptGroupService_1.PromptGroupService.createGroup({
           group_name,
           display_order,
-          is_visible
+          is_visible,
+          parent_id
         }, type);
         const response = {
           success: true,
@@ -69355,79 +70380,6 @@ var require_promptGroups = __commonJS({
         const response = {
           success: false,
           error: "Failed to delete group"
-        };
-        return res.status(500).json(response);
-      }
-    });
-    router.put("/reorder", async (req, res) => {
-      try {
-        const { group_orders, type = "positive" } = req.body;
-        if (!Array.isArray(group_orders)) {
-          const response2 = {
-            success: false,
-            error: "group_orders must be an array"
-          };
-          return res.status(400).json(response2);
-        }
-        const updatedCount = await promptGroupService_1.PromptGroupService.updateGroupOrders(group_orders, type);
-        const response = {
-          success: true,
-          data: {
-            updated_count: updatedCount,
-            message: `Successfully updated ${updatedCount} group orders`
-          }
-        };
-        return res.json(response);
-      } catch (error) {
-        console.error("Error updating group orders:", error);
-        const response = {
-          success: false,
-          error: "Failed to update group orders"
-        };
-        return res.status(500).json(response);
-      }
-    });
-    router.put("/move-prompt", async (req, res) => {
-      try {
-        const { prompt_id, target_group_id, type = "positive" } = req.body;
-        if (!prompt_id) {
-          const response2 = {
-            success: false,
-            error: "prompt_id is required"
-          };
-          return res.status(400).json(response2);
-        }
-        const success = await promptGroupService_1.PromptGroupService.movePromptToGroup(parseInt(prompt_id), target_group_id ? parseInt(target_group_id) : null, type);
-        const response = {
-          success: true,
-          data: {
-            moved: success,
-            message: success ? "Prompt moved successfully" : "Prompt not found"
-          }
-        };
-        return res.json(response);
-      } catch (error) {
-        console.error("Error moving prompt:", error);
-        const response = {
-          success: false,
-          error: "Failed to move prompt"
-        };
-        return res.status(500).json(response);
-      }
-    });
-    router.get("/export", async (req, res) => {
-      try {
-        const { type = "positive" } = req.query;
-        const exportData = await promptGroupService_1.PromptGroupService.exportToJSON(type);
-        const filename = `prompt_groups_${type}_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.json`;
-        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-        res.setHeader("Content-Type", "application/json");
-        return res.json(exportData);
-      } catch (error) {
-        console.error("Error exporting groups:", error);
-        const response = {
-          success: false,
-          error: "Failed to export groups"
         };
         return res.status(500).json(response);
       }
@@ -74052,7 +75004,7 @@ var require_create_id = __commonJS({
 });
 
 // node_modules/node-cron/dist/cjs/logger.js
-var require_logger = __commonJS({
+var require_logger2 = __commonJS({
   "node_modules/node-cron/dist/cjs/logger.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -74181,7 +75133,7 @@ var require_runner = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.Runner = void 0;
     var create_id_1 = require_create_id();
-    var logger_1 = __importDefault2(require_logger());
+    var logger_1 = __importDefault2(require_logger2());
     var tracked_promise_1 = require_tracked_promise();
     function emptyOnFn() {
     }
@@ -74837,7 +75789,7 @@ var require_inline_scheduled_task = __commonJS({
     var time_matcher_1 = require_time_matcher();
     var create_id_1 = require_create_id();
     var state_machine_1 = require_state_machine();
-    var logger_1 = __importDefault2(require_logger());
+    var logger_1 = __importDefault2(require_logger2());
     var localized_time_1 = require_localized_time();
     var TaskEmitter = class extends events_1.default {
     };
@@ -75090,7 +76042,7 @@ var require_background_scheduled_task = __commonJS({
     var stream_1 = require("stream");
     var state_machine_1 = require_state_machine();
     var localized_time_1 = require_localized_time();
-    var logger_1 = __importDefault2(require_logger());
+    var logger_1 = __importDefault2(require_logger2());
     var time_matcher_1 = require_time_matcher();
     var daemonPath = (0, path_12.resolve)(__dirname, "daemon.js");
     var TaskEmitter = class extends stream_1.EventEmitter {
@@ -83831,13 +84783,42 @@ var require_folderScan = __commonJS({
       }
       static saveScanLog(folderId, result) {
         try {
+          const scanDate = (/* @__PURE__ */ new Date()).toISOString();
+          const scanStatus = result.errors.length > 0 ? "error" : "success";
+          const errorDetails = result.errors.length > 0 ? JSON.stringify(result.errors) : null;
+          const lastLog = init_12.db.prepare(`
+        SELECT id, scan_status, total_scanned, new_images, existing_images 
+        FROM scan_logs 
+        WHERE folder_id = ? 
+        ORDER BY scan_date DESC 
+        LIMIT 1
+      `).get(folderId);
+          const isIdentical = lastLog && lastLog.scan_status === scanStatus && lastLog.total_scanned === result.totalScanned && lastLog.new_images === result.newImages && lastLog.existing_images === result.existingImages;
+          if (isIdentical) {
+            init_12.db.prepare(`
+          UPDATE scan_logs 
+          SET scan_date = ?, duration_ms = ?
+          WHERE id = ?
+        `).run(scanDate, result.duration, lastLog.id);
+          } else {
+            init_12.db.prepare(`
+          INSERT INTO scan_logs (
+            folder_id, scan_date, scan_status,
+            total_scanned, new_images, existing_images, updated_paths, missing_images,
+            errors_count, duration_ms, error_details
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(folderId, scanDate, scanStatus, result.totalScanned, result.newImages, result.existingImages, result.updatedPaths, result.missingImages, result.errors.length, result.duration, errorDetails);
+          }
           init_12.db.prepare(`
-        INSERT INTO scan_logs (
-          folder_id, scan_date, scan_status,
-          total_scanned, new_images, existing_images, updated_paths, missing_images,
-          errors_count, duration_ms, error_details
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(folderId, (/* @__PURE__ */ new Date()).toISOString(), result.errors.length > 0 ? "error" : "success", result.totalScanned, result.newImages, result.existingImages, result.updatedPaths, result.missingImages, result.errors.length, result.duration, result.errors.length > 0 ? JSON.stringify(result.errors) : null);
+        DELETE FROM scan_logs 
+        WHERE folder_id = ? 
+        AND id NOT IN (
+          SELECT id FROM scan_logs 
+          WHERE folder_id = ? 
+          ORDER BY scan_date DESC 
+          LIMIT 300
+        )
+      `).run(folderId, folderId);
         } catch (error) {
           console.error("\uC2A4\uCE94 \uB85C\uADF8 \uC800\uC7A5 \uC2E4\uD328:", error);
         }
@@ -84158,17 +85139,23 @@ var require_autoScanScheduler = __commonJS({
             this.isRunning = false;
           }
         });
-        const phase2IntervalSeconds = systemSettingsService_1.SystemSettingsService.getPhase2Interval();
-        const phase2IntervalMs = phase2IntervalSeconds * 1e3;
+        const phase2IntervalMs = 1e3;
         const runPhase2 = async () => {
-          const unprocessedCount = backgroundProcessorService_1.BackgroundProcessorService.getUnprocessedCount();
-          if (unprocessedCount > 0) {
-            console.log(`\u{1F528} \uBC31\uADF8\uB77C\uC6B4\uB4DC \uCC98\uB9AC \uC2DC\uC791: ${unprocessedCount}\uAC1C \uB300\uAE30 \uC911`);
-            try {
-              await backgroundProcessorService_1.BackgroundProcessorService.processUnhashedImages();
-            } catch (error) {
-              console.error("\u274C \uBC31\uADF8\uB77C\uC6B4\uB4DC \uCC98\uB9AC \uC911 \uC624\uB958 \uBC1C\uC0DD:", error);
+          if (this.isPhase2Running) {
+            return;
+          }
+          this.isPhase2Running = true;
+          try {
+            const unprocessedCount = backgroundProcessorService_1.BackgroundProcessorService.getUnprocessedCount();
+            if (unprocessedCount > 0) {
+              try {
+                await backgroundProcessorService_1.BackgroundProcessorService.processUnhashedImages();
+              } catch (error) {
+                console.error("\u274C \uBC31\uADF8\uB77C\uC6B4\uB4DC \uCC98\uB9AC \uC911 \uC624\uB958 \uBC1C\uC0DD:", error);
+              }
             }
+          } finally {
+            this.isPhase2Running = false;
           }
         };
         runPhase2();
@@ -84200,7 +85187,7 @@ var require_autoScanScheduler = __commonJS({
           }
         };
         startFileVerification();
-        console.log(`\u2705 \uC790\uB3D9 \uC2A4\uCE94 \uC2A4\uCF00\uC904\uB7EC \uC2DC\uC791\uB428 (Phase 1: 1\uBD84\uB9C8\uB2E4, Phase 2: ${phase2IntervalSeconds}\uCD08\uB9C8\uB2E4)`);
+        console.log(`\u2705 \uC790\uB3D9 \uC2A4\uCE94 \uC2A4\uCF00\uC904\uB7EC \uC2DC\uC791\uB428 (Phase 1: 1\uBD84\uB9C8\uB2E4, Phase 2: 1\uCD08\uB9C8\uB2E4, Phase 3: \uD30C\uC77C \uAC80\uC99D \uD65C\uC131\uD654\uC2DC)`);
       }
       static stop() {
         if (!this.cronTask && !this.phase2Timer && !this.phase3Timer) {
@@ -84249,6 +85236,7 @@ var require_autoScanScheduler = __commonJS({
     AutoScanScheduler.phase2Timer = null;
     AutoScanScheduler.phase3Timer = null;
     AutoScanScheduler.isRunning = false;
+    AutoScanScheduler.isPhase2Running = false;
   }
 });
 
@@ -84267,16 +85255,17 @@ var require_autoTagScheduler = __commonJS({
     var imageTaggerService_12 = require_imageTaggerService();
     var systemSettingsService_1 = require_systemSettingsService();
     var ratingScoreService_1 = require_ratingScoreService();
+    var promptCollectionService_1 = require_promptCollectionService();
     var path_12 = __importDefault2(require("path"));
     var AutoTagScheduler = class {
       constructor() {
         this.isRunning = false;
+        this.isProcessing = false;
         this.pollingTimer = null;
-        this.processingTimer = null;
         this.PROCESSING_DELAY_MS = 1e3;
       }
       getPollingIntervalMs() {
-        return systemSettingsService_1.SystemSettingsService.getAutoTagPollingInterval() * 1e3;
+        return 1e3;
       }
       getBatchSize() {
         return systemSettingsService_1.SystemSettingsService.getAutoTagBatchSize();
@@ -84295,9 +85284,10 @@ var require_autoTagScheduler = __commonJS({
         const batchSize = this.getBatchSize();
         console.log("[AutoTagScheduler] Starting auto-tag scheduler...");
         console.log(`[AutoTagScheduler] Polling interval: ${pollingIntervalMs / 1e3}s`);
-        console.log(`[AutoTagScheduler] Batch size: ${batchSize}`);
         this.isRunning = true;
         this.processUntaggedImages();
+        if (this.pollingTimer)
+          clearInterval(this.pollingTimer);
         this.pollingTimer = setInterval(() => {
           this.processUntaggedImages();
         }, pollingIntervalMs);
@@ -84309,17 +85299,17 @@ var require_autoTagScheduler = __commonJS({
           clearInterval(this.pollingTimer);
           this.pollingTimer = null;
         }
-        if (this.processingTimer) {
-          clearTimeout(this.processingTimer);
-          this.processingTimer = null;
-        }
         console.log("[AutoTagScheduler] Stopped");
       }
       async processUntaggedImages() {
+        if (this.isProcessing) {
+          return;
+        }
         const settings = settingsService_12.settingsService.loadSettings();
         if (!settings.tagger.enabled) {
           return;
         }
+        this.isProcessing = true;
         try {
           const batchSize = this.getBatchSize();
           const untaggedImages = init_12.db.prepare(`
@@ -84334,19 +85324,12 @@ var require_autoTagScheduler = __commonJS({
           AND if_.file_status = 'active'
         LIMIT ?
       `).all(batchSize);
-          const totalUntagged = init_12.db.prepare(`
-        SELECT COUNT(*) as count
-        FROM media_metadata mm
-        LEFT JOIN image_files if_ ON mm.composite_hash = if_.composite_hash
-        WHERE mm.auto_tags IS NULL
-          AND if_.original_file_path IS NOT NULL
-          AND if_.file_status = 'active'
-      `).get();
           if (untaggedImages.length === 0) {
             return;
           }
-          console.log(`[AutoTagScheduler] Found ${untaggedImages.length} untagged images (total: ${totalUntagged.count})`);
           for (let i = 0; i < untaggedImages.length; i++) {
+            if (!this.isRunning)
+              break;
             const image = untaggedImages[i];
             try {
               await this.tagSingleImage(image.composite_hash, image.original_file_path, image.media_type);
@@ -84358,11 +85341,10 @@ var require_autoTagScheduler = __commonJS({
             }
           }
           console.log(`[AutoTagScheduler] Batch processing completed (${untaggedImages.length} images)`);
-          this.processingTimer = setTimeout(() => {
-            this.processUntaggedImages();
-          }, 2e3);
         } catch (error) {
           console.error("[AutoTagScheduler] Error in processUntaggedImages:", error);
+        } finally {
+          this.isProcessing = false;
         }
       }
       async tagSingleImage(compositeHash, filePath, mediaType) {
@@ -84395,7 +85377,17 @@ var require_autoTagScheduler = __commonJS({
       SET auto_tags = ?, rating_score = ?
       WHERE composite_hash = ?
     `).run(autoTags, ratingScore, compositeHash);
-        console.log(`[AutoTagScheduler] \u2705 Tagged (${mediaType}): ${path_12.default.basename(filePath)}`);
+        if (result.taglist) {
+          try {
+            const tags = result.taglist.split(",").map((t) => t.trim()).filter((t) => t.length > 0);
+            if (tags.length > 0) {
+              const autoPrompts = tags.map((tag) => ({ prompt: tag }));
+              await promptCollectionService_1.PromptCollectionService.batchAddOrIncrementAuto(autoPrompts);
+            }
+          } catch (error) {
+            console.error("[AutoTagScheduler] Failed to collect auto prompts:", error);
+          }
+        }
       }
       delay(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
@@ -84425,8 +85417,8 @@ var require_autoTagScheduler = __commonJS({
       restart() {
         if (this.isRunning) {
           this.stop();
-          setTimeout(() => this.start(), 100);
         }
+        setTimeout(() => this.start(), 100);
       }
       async triggerManualProcessing() {
         console.log("[AutoTagScheduler] Manual processing triggered");
@@ -84435,6 +85427,67 @@ var require_autoTagScheduler = __commonJS({
     };
     exports2.AutoTagScheduler = AutoTagScheduler;
     exports2.autoTagScheduler = new AutoTagScheduler();
+  }
+});
+
+// backend/dist/services/maintenanceService.js
+var require_maintenanceService = __commonJS({
+  "backend/dist/services/maintenanceService.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.MaintenanceService = void 0;
+    var init_12 = require_init2();
+    var promptCollectionService_1 = require_promptCollectionService();
+    var MaintenanceService = class {
+      static async syncAutoTags() {
+        console.log("\u{1F504} [Maintenance] Starting auto-tag sync...");
+        const startTime = Date.now();
+        try {
+          const rows = init_12.db.prepare(`
+        SELECT auto_tags
+        FROM media_metadata
+        WHERE auto_tags IS NOT NULL
+      `).all();
+          console.log(`\u{1F504} [Maintenance] Found ${rows.length} images with auto_tags. Processing...`);
+          let totalTags = 0;
+          const uniqueTags = /* @__PURE__ */ new Set();
+          console.log("\u{1F504} [Maintenance] Truncating auto_prompt_collection for fresh rebuild...");
+          init_12.db.prepare("DELETE FROM auto_prompt_collection").run();
+          init_12.db.prepare("DELETE FROM sqlite_sequence WHERE name='auto_prompt_collection'").run();
+          const allPrompts = [];
+          for (const row of rows) {
+            try {
+              const tagsData = JSON.parse(row.auto_tags);
+              if (tagsData && tagsData.taglist) {
+                const tags = tagsData.taglist.split(",").map((t) => t.trim()).filter((t) => t.length > 0);
+                for (const tag of tags) {
+                  allPrompts.push(tag);
+                }
+              }
+            } catch (e) {
+            }
+          }
+          console.log(`\u{1F504} [Maintenance] Extracted ${allPrompts.length} total tags. Batching insert...`);
+          const CHUNK_SIZE = 500;
+          let processed = 0;
+          for (let i = 0; i < allPrompts.length; i += CHUNK_SIZE) {
+            const chunk = allPrompts.slice(i, i + CHUNK_SIZE);
+            const formatForService = chunk.map((p) => ({ prompt: p }));
+            await promptCollectionService_1.PromptCollectionService.batchAddOrIncrementAuto(formatForService);
+            processed += chunk.length;
+            if (processed % 5e3 === 0) {
+              console.log(`\u{1F504} [Maintenance] Processed ${processed}/${allPrompts.length} tags...`);
+            }
+          }
+          console.log(`\u2705 [Maintenance] Sync complete. Processed ${processed} tags in ${Date.now() - startTime}ms.`);
+          return { processed: rows.length, collected: processed };
+        } catch (error) {
+          console.error("\u274C [Maintenance] Sync failed:", error);
+          throw error;
+        }
+      }
+    };
+    exports2.MaintenanceService = MaintenanceService;
   }
 });
 
@@ -84488,6 +85541,8 @@ var require_settings5 = __commonJS({
     var ratingScoreService_1 = require_ratingScoreService();
     var systemSettingsService_1 = require_systemSettingsService();
     var autoScanScheduler_12 = require_autoScanScheduler();
+    var autoTagScheduler_12 = require_autoTagScheduler();
+    var maintenanceService_1 = require_maintenanceService();
     var router = (0, express_12.Router)();
     router.get("/", (0, errorHandler_12.asyncHandler)(async (req, res) => {
       const settings = settingsService_12.settingsService.loadSettings();
@@ -84557,6 +85612,7 @@ var require_settings5 = __commonJS({
       }
       const updatedSettings = settingsService_12.settingsService.updateTaggerSettings(taggerSettings);
       await imageTaggerService_12.imageTaggerService.reloadConfig();
+      autoTagScheduler_12.autoTagScheduler.restart();
       res.json({
         success: true,
         data: updatedSettings,
@@ -84943,6 +85999,22 @@ var require_settings5 = __commonJS({
         data: updatedConfig,
         message: "\uC790\uB3D9 \uD0DC\uAE45 \uC2A4\uCF00\uC904\uB7EC \uC124\uC815\uC774 \uC5C5\uB370\uC774\uD2B8\uB418\uC5C8\uC2B5\uB2C8\uB2E4"
       });
+      return;
+    }));
+    router.post("/maintenance/sync-tags", (0, errorHandler_12.asyncHandler)(async (req, res) => {
+      try {
+        const result = await maintenanceService_1.MaintenanceService.syncAutoTags();
+        res.json({
+          success: true,
+          data: result,
+          message: `Sync complete. Processed ${result.processed} images, collected ${result.collected} tags.`
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error during sync"
+        });
+      }
       return;
     }));
     exports2.settingsRoutes = router;
@@ -91738,6 +92810,7 @@ var require_generationHistoryService = __commonJS({
     var Group_1 = require_Group();
     var axios_1 = __importDefault2(require_axios());
     var form_data_1 = __importDefault2(require_form_data());
+    var shared_12 = (init_dist(), __toCommonJS(dist_exports));
     var GenerationHistoryService = class {
       static async createComfyUIHistory(data) {
         const historyRecord = {
@@ -91851,7 +92924,7 @@ var require_generationHistoryService = __commonJS({
       }
       static async uploadToMainImageAPI(imageBuffer, serviceType, historyId) {
         try {
-          const port = process.env.PORT || 1566;
+          const port = process.env.PORT || shared_12.PORTS.BACKEND_DEFAULT;
           const uploadUrl = `http://localhost:${port}/api/images/upload`;
           const formData = new form_data_1.default();
           formData.append("image", imageBuffer, {
@@ -92258,7 +93331,10 @@ var require_tempImageService = __commonJS({
           console.log(`\u2705 Temp image directory initialized: ${this.tempDir}`);
           await fs_12.default.promises.mkdir(this.canvasDir, { recursive: true });
           console.log(`\u2705 Canvas directory initialized: ${this.canvasDir}`);
-          await this.cleanupAll();
+          const { settingsService } = await Promise.resolve().then(() => __importStar2(require_settingsService()));
+          const settings = settingsService.loadSettings();
+          const shouldCleanupCanvas = settings.general.autoCleanupCanvasOnShutdown ?? false;
+          await this.cleanupAll(!shouldCleanupCanvas);
         } catch (error) {
           console.error("Failed to initialize temp directory:", error);
           throw error;
@@ -94895,33 +95971,33 @@ var require_Wildcard = __commonJS({
           let wildcardId;
           if (data.customId) {
             db.prepare(`
-          INSERT INTO wildcards (id, name, description, parent_id, include_children)
-          VALUES (?, ?, ?, ?, ?)
-        `).run(data.customId, data.name, data.description || null, data.parent_id ?? null, data.include_children ?? 0);
+          INSERT INTO wildcards (id, name, description, parent_id, include_children, type, chain_option)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(data.customId, data.name, data.description || null, data.parent_id ?? null, data.include_children ?? 0, data.type || "wildcard", data.chain_option || "replace");
             wildcardId = data.customId;
           } else {
             const wildcardResult = db.prepare(`
-          INSERT INTO wildcards (name, description, parent_id, include_children)
-          VALUES (?, ?, ?, ?)
-        `).run(data.name, data.description || null, data.parent_id ?? null, data.include_children ?? 0);
+          INSERT INTO wildcards (name, description, parent_id, include_children, type, chain_option)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(data.name, data.description || null, data.parent_id ?? null, data.include_children ?? 0, data.type || "wildcard", data.chain_option || "replace");
             wildcardId = wildcardResult.lastInsertRowid;
           }
           if (data.items.comfyui && data.items.comfyui.length > 0) {
             const insertItem = db.prepare(`
-          INSERT INTO wildcard_items (wildcard_id, tool, content, order_index)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO wildcard_items (wildcard_id, tool, content, weight, order_index)
+          VALUES (?, ?, ?, ?, ?)
         `);
-            data.items.comfyui.forEach((content, index) => {
-              insertItem.run(wildcardId, "comfyui", content, index);
+            data.items.comfyui.forEach((item, index) => {
+              insertItem.run(wildcardId, "comfyui", item.content, item.weight, index);
             });
           }
           if (data.items.nai && data.items.nai.length > 0) {
             const insertItem = db.prepare(`
-          INSERT INTO wildcard_items (wildcard_id, tool, content, order_index)
-          VALUES (?, ?, ?, ?)
+          INSERT INTO wildcard_items (wildcard_id, tool, content, weight, order_index)
+          VALUES (?, ?, ?, ?, ?)
         `);
-            data.items.nai.forEach((content, index) => {
-              insertItem.run(wildcardId, "nai", content, index);
+            data.items.nai.forEach((item, index) => {
+              insertItem.run(wildcardId, "nai", item.content, item.weight, index);
             });
           }
           return _WildcardModel.findById(wildcardId);
@@ -94952,6 +96028,14 @@ var require_Wildcard = __commonJS({
             updates.push("include_children = ?");
             params.push(data.include_children);
           }
+          if (data.type !== void 0) {
+            updates.push("type = ?");
+            params.push(data.type);
+          }
+          if (data.chain_option !== void 0) {
+            updates.push("chain_option = ?");
+            params.push(data.chain_option);
+          }
           updates.push("updated_date = CURRENT_TIMESTAMP");
           params.push(id);
           if (updates.length > 0) {
@@ -94965,20 +96049,20 @@ var require_Wildcard = __commonJS({
             db.prepare("DELETE FROM wildcard_items WHERE wildcard_id = ?").run(id);
             if (data.items.comfyui && data.items.comfyui.length > 0) {
               const insertItem = db.prepare(`
-            INSERT INTO wildcard_items (wildcard_id, tool, content, order_index)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO wildcard_items (wildcard_id, tool, content, weight, order_index)
+            VALUES (?, ?, ?, ?, ?)
           `);
-              data.items.comfyui.forEach((content, index) => {
-                insertItem.run(id, "comfyui", content, index);
+              data.items.comfyui.forEach((item, index) => {
+                insertItem.run(id, "comfyui", item.content, item.weight, index);
               });
             }
             if (data.items.nai && data.items.nai.length > 0) {
               const insertItem = db.prepare(`
-            INSERT INTO wildcard_items (wildcard_id, tool, content, order_index)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO wildcard_items (wildcard_id, tool, content, weight, order_index)
+            VALUES (?, ?, ?, ?, ?)
           `);
-              data.items.nai.forEach((content, index) => {
-                insertItem.run(id, "nai", content, index);
+              data.items.nai.forEach((item, index) => {
+                insertItem.run(id, "nai", item.content, item.weight, index);
               });
             }
           }
@@ -95089,12 +96173,12 @@ var require_Wildcard = __commonJS({
         const db = (0, userSettingsDb_12.getUserSettingsDb)();
         return db.prepare("SELECT * FROM wildcard_items WHERE id = ?").get(id);
       }
-      static create(wildcardId, tool, content, orderIndex) {
+      static create(wildcardId, tool, content, weight, orderIndex) {
         const db = (0, userSettingsDb_12.getUserSettingsDb)();
         const result = db.prepare(`
-      INSERT INTO wildcard_items (wildcard_id, tool, content, order_index)
-      VALUES (?, ?, ?, ?)
-    `).run(wildcardId, tool, content, orderIndex);
+      INSERT INTO wildcard_items (wildcard_id, tool, content, weight, order_index)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(wildcardId, tool, content, weight, orderIndex);
         const item = _WildcardItemModel.findById(result.lastInsertRowid);
         if (!item) {
           throw new Error("Failed to create wildcard item");
@@ -95131,7 +96215,43 @@ var require_wildcardService = __commonJS({
         const wildcards = Wildcard_1.WildcardModel.findAllWithItems();
         const wildcardMap = /* @__PURE__ */ new Map();
         wildcards.forEach((wc) => wildcardMap.set(wc.name, wc));
-        return this.parseRecursive(text, wildcardMap, tool, /* @__PURE__ */ new Set());
+        let result = text;
+        result = this.parseChains(result, wildcardMap, tool);
+        return this.parseRecursive(result, wildcardMap, tool, /* @__PURE__ */ new Set());
+      }
+      static parseChains(text, wildcardMap, tool) {
+        const tokens = text.split(",").map((t) => t.trim());
+        const processedTokens = tokens.map((token) => {
+          const chain = wildcardMap.get(token);
+          if (!chain || chain.type !== "chain") {
+            return token;
+          }
+          const items = this.collectItemsWithChildren(chain, tool, wildcardMap);
+          if (items.length === 0) {
+            return token;
+          }
+          const selectedItem = this.selectRandomItemWithWeight(items);
+          if (chain.chain_option === "append") {
+            return `${token}, ${selectedItem.content}`;
+          } else {
+            return selectedItem.content;
+          }
+        });
+        return processedTokens.join(", ");
+      }
+      static selectRandomItemWithWeight(items) {
+        if (items.length === 0)
+          throw new Error("Items array is empty");
+        const totalWeight = items.reduce((sum, item) => sum + (item.weight || 1), 0);
+        let random = Math.random() * totalWeight;
+        for (const item of items) {
+          const weight = item.weight || 1;
+          if (random < weight) {
+            return item;
+          }
+          random -= weight;
+        }
+        return items[items.length - 1];
       }
       static parseWeightListSyntax(text) {
         const pattern = /\(([^,)]+),\s*([\d.,\s-]+)\)/g;
@@ -95198,8 +96318,7 @@ var require_wildcardService = __commonJS({
             console.warn(`No items found for wildcard '${name}' with tool '${tool}'`);
             return "";
           }
-          const randomIndex = Math.floor(Math.random() * toolItems.length);
-          const selectedItem = toolItems[randomIndex];
+          const selectedItem = this.selectRandomItemWithWeight(toolItems);
           visited.add(name);
           const recursiveResult = this.parseRecursive(selectedItem.content, wildcardMap, tool, visited);
           visited.delete(name);
@@ -95804,7 +96923,7 @@ var require_wildcards = __commonJS({
             name: wildcardName,
             description: `Auto-generated from ${folder.folderName}`,
             items: {
-              comfyui: items,
+              comfyui: items.map((content) => ({ content, weight: 1 })),
               nai: []
             },
             customId,
@@ -96281,8 +97400,10 @@ var require_imageEditorService = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.ImageEditorService = void 0;
     var sharp_1 = __importDefault2(require("sharp"));
+    var path_12 = __importDefault2(require("path"));
     var fs_12 = __importDefault2(require("fs"));
     var tempImageService_1 = require_tempImageService();
+    var runtimePaths_12 = require_runtimePaths();
     var ImageFileModel_1 = require_ImageFileModel();
     var ImageEditorService = class {
       static async editImage(imageId, editOptions, expirationMinutes = 30) {
@@ -96385,6 +97506,34 @@ var require_imageEditorService = __commonJS({
           blend: "multiply"
         }]).png().toBuffer();
       }
+      static async saveAsWebP(imageData, imageId, quality = 90) {
+        const imageFile = ImageFileModel_1.ImageFileModel.findById(imageId);
+        if (!imageFile) {
+          throw new Error(`Image file not found: ${imageId}`);
+        }
+        const base64Data = imageData.replace(/^data:image\/\w+;base64,/, "");
+        const imageBuffer = Buffer.from(base64Data, "base64");
+        const originalPath = imageFile.original_file_path;
+        const originalName = path_12.default.basename(originalPath, path_12.default.extname(originalPath));
+        const timestamp = Date.now();
+        const tempId = `edited_${imageId}_${timestamp}`;
+        const newFileName = `${originalName}_edited_${timestamp}.webp`;
+        const canvasDir = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, "canvas");
+        await fs_12.default.promises.mkdir(canvasDir, { recursive: true });
+        const newFilePath = path_12.default.join(canvasDir, newFileName);
+        const webpBuffer = await (0, sharp_1.default)(imageBuffer).webp({ quality: Math.min(100, Math.max(1, quality)) }).toBuffer();
+        const metadata = await (0, sharp_1.default)(webpBuffer).metadata();
+        await fs_12.default.promises.writeFile(newFilePath, webpBuffer);
+        tempImageService_1.TempImageService.registerTempFile(tempId, imageId, newFilePath, void 0, 60);
+        return {
+          success: true,
+          filePath: newFilePath,
+          tempId,
+          width: metadata.width || 0,
+          height: metadata.height || 0,
+          fileSize: webpBuffer.length
+        };
+      }
     };
     exports2.ImageEditorService = ImageEditorService;
   }
@@ -96402,9 +97551,47 @@ var require_image_editor_routes = __commonJS({
     var errorHandler_12 = require_errorHandler();
     var imageEditorService_1 = require_imageEditorService();
     var tempImageService_1 = require_tempImageService();
+    var ImageFileModel_1 = require_ImageFileModel();
+    var runtimePaths_12 = require_runtimePaths();
     var path_12 = __importDefault2(require("path"));
     var fs_12 = __importDefault2(require("fs"));
+    var sharp_1 = __importDefault2(require("sharp"));
     var router = (0, express_12.Router)();
+    router.get("/:id/webp", (0, errorHandler_12.asyncHandler)(async (req, res) => {
+      const imageId = parseInt(req.params.id);
+      if (isNaN(imageId)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid image ID"
+        });
+      }
+      try {
+        const imageFile = ImageFileModel_1.ImageFileModel.findById(imageId);
+        if (!imageFile) {
+          return res.status(404).json({
+            success: false,
+            error: "Image file not found"
+          });
+        }
+        const originalPath = imageFile.original_file_path;
+        if (!fs_12.default.existsSync(originalPath)) {
+          return res.status(404).json({
+            success: false,
+            error: "Image file not found on disk"
+          });
+        }
+        const webpBuffer = await (0, sharp_1.default)(originalPath).webp({ quality: 100, lossless: false }).toBuffer();
+        res.set("Content-Type", "image/webp");
+        res.set("Cache-Control", "private, max-age=300");
+        return res.send(webpBuffer);
+      } catch (error) {
+        console.error("Error converting image to WebP:", error);
+        return res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to convert image"
+        });
+      }
+    }));
     router.post("/:id/temp", (0, errorHandler_12.asyncHandler)(async (req, res) => {
       const imageId = parseInt(req.params.id);
       if (isNaN(imageId)) {
@@ -96468,6 +97655,35 @@ var require_image_editor_routes = __commonJS({
         });
       } catch (error) {
         console.error("Error saving edited image:", error);
+        return res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to save edited image"
+        });
+      }
+    }));
+    router.post("/:id/save-webp", (0, errorHandler_12.asyncHandler)(async (req, res) => {
+      const imageId = parseInt(req.params.id);
+      if (isNaN(imageId)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid image ID"
+        });
+      }
+      const { imageData, quality = 90 } = req.body;
+      if (!imageData) {
+        return res.status(400).json({
+          success: false,
+          error: "Image data is required"
+        });
+      }
+      try {
+        const result = await imageEditorService_1.ImageEditorService.saveAsWebP(imageData, imageId, quality);
+        return res.json({
+          success: true,
+          data: result
+        });
+      } catch (error) {
+        console.error("Error saving edited image as WebP:", error);
         return res.status(500).json({
           success: false,
           error: error instanceof Error ? error.message : "Failed to save edited image"
@@ -96573,6 +97789,174 @@ var require_image_editor_routes = __commonJS({
         return res.status(500).json({
           success: false,
           error: error instanceof Error ? error.message : "Failed to create blank mask"
+        });
+      }
+    }));
+    router.get("/canvas/:filename/webp", (0, errorHandler_12.asyncHandler)(async (req, res) => {
+      const { filename } = req.params;
+      try {
+        const canvasDir = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, "canvas");
+        const filePath = path_12.default.join(canvasDir, filename);
+        const resolvedPath = path_12.default.resolve(filePath);
+        const resolvedCanvasDir = path_12.default.resolve(canvasDir);
+        if (!resolvedPath.startsWith(resolvedCanvasDir)) {
+          return res.status(403).json({
+            success: false,
+            error: "Access denied"
+          });
+        }
+        if (!fs_12.default.existsSync(filePath)) {
+          return res.status(404).json({
+            success: false,
+            error: "File not found"
+          });
+        }
+        const webpBuffer = await (0, sharp_1.default)(filePath).webp({ quality: 100, lossless: false }).toBuffer();
+        res.set("Content-Type", "image/webp");
+        res.set("Cache-Control", "private, max-age=300");
+        return res.send(webpBuffer);
+      } catch (error) {
+        console.error("Error converting canvas image to WebP:", error);
+        return res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to convert image"
+        });
+      }
+    }));
+    router.post("/canvas/:filename/save-webp", (0, errorHandler_12.asyncHandler)(async (req, res) => {
+      const { filename } = req.params;
+      const { imageData, quality = 90, createNew = false } = req.body;
+      if (!imageData) {
+        return res.status(400).json({
+          success: false,
+          error: "Image data is required"
+        });
+      }
+      try {
+        const canvasDir = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, "canvas");
+        await fs_12.default.promises.mkdir(canvasDir, { recursive: true });
+        const base64Data = imageData.replace(/^data:image\/\w+;base64,/, "");
+        const imageBuffer = Buffer.from(base64Data, "base64");
+        let newFileName;
+        if (createNew) {
+          const baseName = path_12.default.basename(filename, path_12.default.extname(filename));
+          const timestamp = Date.now();
+          newFileName = `${baseName}_${timestamp}.webp`;
+        } else {
+          newFileName = filename;
+        }
+        const filePath = path_12.default.join(canvasDir, newFileName);
+        const resolvedPath = path_12.default.resolve(filePath);
+        const resolvedCanvasDir = path_12.default.resolve(canvasDir);
+        if (!resolvedPath.startsWith(resolvedCanvasDir)) {
+          return res.status(403).json({
+            success: false,
+            error: "Access denied"
+          });
+        }
+        const webpBuffer = await (0, sharp_1.default)(imageBuffer).webp({ quality: Math.min(100, Math.max(1, quality)) }).toBuffer();
+        const metadata = await (0, sharp_1.default)(webpBuffer).metadata();
+        await fs_12.default.promises.writeFile(filePath, webpBuffer);
+        return res.json({
+          success: true,
+          data: {
+            filename: newFileName,
+            filePath,
+            url: `/temp/canvas/${newFileName}`,
+            width: metadata.width || 0,
+            height: metadata.height || 0,
+            fileSize: webpBuffer.length
+          }
+        });
+      } catch (error) {
+        console.error("Error saving canvas image:", error);
+        return res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to save canvas image"
+        });
+      }
+    }));
+    router.get("/canvas", (0, errorHandler_12.asyncHandler)(async (req, res) => {
+      try {
+        const canvasDir = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, "canvas");
+        if (!fs_12.default.existsSync(canvasDir)) {
+          return res.json({
+            success: true,
+            data: {
+              images: [],
+              total: 0
+            }
+          });
+        }
+        const files = await fs_12.default.promises.readdir(canvasDir);
+        const imageExtensions = [".webp", ".png", ".jpg", ".jpeg"];
+        const imageFiles = await Promise.all(files.filter((file) => imageExtensions.some((ext) => file.toLowerCase().endsWith(ext))).map(async (file) => {
+          const filePath = path_12.default.join(canvasDir, file);
+          const stats = await fs_12.default.promises.stat(filePath);
+          let width = 0;
+          let height = 0;
+          try {
+            const metadata = await (0, sharp_1.default)(filePath).metadata();
+            width = metadata.width || 0;
+            height = metadata.height || 0;
+          } catch (e) {
+          }
+          return {
+            filename: file,
+            path: filePath,
+            url: `/temp/canvas/${file}`,
+            size: stats.size,
+            width,
+            height,
+            createdAt: stats.birthtime.toISOString(),
+            modifiedAt: stats.mtime.toISOString()
+          };
+        }));
+        imageFiles.sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime());
+        return res.json({
+          success: true,
+          data: {
+            images: imageFiles,
+            total: imageFiles.length
+          }
+        });
+      } catch (error) {
+        console.error("Error listing canvas images:", error);
+        return res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to list canvas images"
+        });
+      }
+    }));
+    router.delete("/canvas/:filename", (0, errorHandler_12.asyncHandler)(async (req, res) => {
+      const { filename } = req.params;
+      try {
+        const canvasDir = path_12.default.join(runtimePaths_12.runtimePaths.tempDir, "canvas");
+        const filePath = path_12.default.join(canvasDir, filename);
+        const resolvedPath = path_12.default.resolve(filePath);
+        const resolvedCanvasDir = path_12.default.resolve(canvasDir);
+        if (!resolvedPath.startsWith(resolvedCanvasDir)) {
+          return res.status(403).json({
+            success: false,
+            error: "Access denied"
+          });
+        }
+        if (!fs_12.default.existsSync(filePath)) {
+          return res.status(404).json({
+            success: false,
+            error: "File not found"
+          });
+        }
+        await fs_12.default.promises.unlink(filePath);
+        return res.json({
+          success: true,
+          message: "Canvas image deleted successfully"
+        });
+      } catch (error) {
+        console.error("Error deleting canvas image:", error);
+        return res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to delete canvas image"
         });
       }
     }));
@@ -97368,6 +98752,7 @@ var require_externalApi_routes = __commonJS({
     var express_12 = require_express2();
     var ExternalApiProvider_1 = require_ExternalApiProvider();
     var externalApiService_1 = require_externalApiService();
+    var llmService_1 = require_llmService();
     var asyncHandler_1 = require_asyncHandler();
     var authMiddleware_12 = require_authMiddleware();
     var router = (0, express_12.Router)();
@@ -97502,6 +98887,23 @@ var require_externalApi_routes = __commonJS({
     }));
     router.post("/providers/:name/test", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
       const { name } = req.params;
+      const provider = ExternalApiProvider_1.ExternalApiProvider.findByName(name);
+      if (!provider) {
+        res.status(404).json({
+          success: false,
+          error: "Provider not found"
+        });
+        return;
+      }
+      const preset = llmService_1.LLMService.getPreset(name);
+      if (provider.provider_type === "llm" && preset && !preset.requires_api_key) {
+        const success2 = await llmService_1.LLMService.testConnection(name);
+        res.json({
+          success: success2,
+          message: success2 ? "Connection test successful" : "Connection test failed - please check if the server is running"
+        });
+        return;
+      }
       const apiKey = ExternalApiProvider_1.ExternalApiProvider.getDecryptedKey(name);
       if (!apiKey) {
         res.status(400).json({
@@ -97510,11 +98912,51 @@ var require_externalApi_routes = __commonJS({
         });
         return;
       }
-      const success = await externalApiService_1.ExternalApiService.testConnection(name, apiKey);
+      const success = await externalApiService_1.ExternalApiService.testConnection(name, apiKey, provider.provider_type);
       res.json({
         success,
         message: success ? "Connection test successful" : "Connection test failed - please check your API key"
       });
+    }));
+    router.get("/llm/presets", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const presets = llmService_1.LLMService.getPresets();
+      res.json({
+        success: true,
+        data: presets
+      });
+    }));
+    router.get("/llm/providers", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const providers = ExternalApiProvider_1.ExternalApiProvider.findAllLLM();
+      res.json({
+        success: true,
+        data: providers
+      });
+    }));
+    router.get("/llm/providers/:name/models", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const { name } = req.params;
+      const result = await llmService_1.LLMService.getModels(name);
+      if (!result.success) {
+        res.status(400).json(result);
+        return;
+      }
+      res.json(result);
+    }));
+    router.post("/llm/providers/:name/chat", (0, asyncHandler_1.asyncHandler)(async (req, res) => {
+      const { name } = req.params;
+      const chatRequest = req.body;
+      if (!chatRequest.messages || !Array.isArray(chatRequest.messages)) {
+        res.status(400).json({
+          success: false,
+          error: "messages array is required"
+        });
+        return;
+      }
+      const result = await llmService_1.LLMService.chat(name, chatRequest);
+      if (!result.success) {
+        res.status(400).json(result);
+        return;
+      }
+      res.json(result);
     }));
     exports2.default = router;
   }
@@ -98402,9 +99844,22 @@ var __importDefault = exports && exports.__importDefault || function(mod) {
   return mod && mod.__esModule ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-require_config();
+var dotenv_1 = __importDefault(require_main());
+var path_1 = __importDefault(require("path"));
+var getEnvPath = () => {
+  if (process.env.PORTABLE_EXECUTABLE_DIR) {
+    return path_1.default.join(process.env.PORTABLE_EXECUTABLE_DIR, ".env");
+  }
+  if (process.execPath.includes("comfyui-image-manager") || true) {
+    return path_1.default.join(path_1.default.dirname(process.execPath), ".env");
+  }
+  return path_1.default.resolve(__dirname, "../../.env");
+};
+var rootEnvPath = getEnvPath();
+dotenv_1.default.config({ path: rootEnvPath });
+console.log(`[Config] Initialized with .env from: ${rootEnvPath}`);
 if (true) {
-  const nativeModulesPath = require("path").join(__dirname, "..", "node_modules");
+  const nativeModulesPath = path_1.default.join(__dirname, "..", "node_modules");
   if (require("fs").existsSync(nativeModulesPath)) {
     process.env.NODE_PATH = nativeModulesPath;
     require("module").Module._initPaths();
@@ -98417,7 +99872,6 @@ var helmet_1 = __importDefault(require_helmet());
 var express_rate_limit_1 = __importDefault(require_dist());
 var express_session_1 = __importDefault(require_express_session());
 var better_sqlite3_session_store_1 = __importDefault(require_src6());
-var path_1 = __importDefault(require("path"));
 var fs_1 = __importDefault(require("fs"));
 var crypto_1 = __importDefault(require("crypto"));
 var runtimePaths_1 = require_runtimePaths();
@@ -98510,8 +99964,8 @@ app.use((0, helmet_1.default)({
 }));
 app.use(apiLimiter);
 var allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:1577",
+  "http://localhost:5555",
+  "http://localhost:1677",
   process.env.FRONTEND_URL
 ].filter(Boolean);
 app.use((0, cors_1.default)({
@@ -98523,11 +99977,11 @@ app.use((0, cors_1.default)({
 app.use(express_1.default.json({ limit: `${shared_1.IMAGE_PROCESSING.MAX_FILE_SIZE_MB}mb`, strict: false }));
 app.use(express_1.default.urlencoded({ extended: true, limit: `${shared_1.IMAGE_PROCESSING.MAX_FILE_SIZE_MB}mb` }));
 var createEnvFileIfNotExists = () => {
-  const envPath = path_1.default.join(__dirname, "../.env");
-  const envExamplePath = path_1.default.join(__dirname, "../.env.example");
+  const envPath = rootEnvPath;
+  const envExamplePath = true ? path_1.default.join(path_1.default.dirname(rootEnvPath), ".env.example") : path_1.default.join(__dirname, "../.env.example");
   if (!fs_1.default.existsSync(envPath) && fs_1.default.existsSync(envExamplePath)) {
     fs_1.default.copyFileSync(envExamplePath, envPath);
-    console.log("\u{1F4DD} Created .env file from .env.example");
+    console.log(`\u{1F4DD} Created .env file from ${path_1.default.basename(envExamplePath)} at ${envPath}`);
   }
 };
 var uploadsDir = runtimePaths_1.runtimePaths.uploadsDir;
@@ -98788,9 +100242,27 @@ ${divider}`);
    - Press Ctrl+C to stop the server
 `);
     };
-    const startHttpServer = () => app.listen(Number(PORT), bindHost, async () => {
-      await printBanner("http");
-    });
+    const startHttpServer = () => {
+      const httpServer = app.listen(Number(PORT), bindHost, async () => {
+        await printBanner("http");
+      });
+      httpServer.on("error", (error) => {
+        if (error.code === "EACCES") {
+          console.error(`
+\u274C ERROR: Port ${PORT} requires elevated privileges or is blocked.`);
+          console.error(`   Please try running the terminal as Administrator or use a different port.`);
+          console.error(`   (Port settings: .env file or PORTS in shared/constants)`);
+        } else if (error.code === "EADDRINUSE") {
+          console.error(`
+\u274C ERROR: Port ${PORT} is already in use.`);
+          console.error(`   Please close the application using this port or choose a different one.`);
+        } else {
+          console.error("\n\u274C Server error:", error);
+        }
+        process.exit(1);
+      });
+      return httpServer;
+    };
     let server;
     if (isSecureContext) {
       const httpsOptions = (0, httpsOptions_1.prepareHttpsOptions)();
@@ -98806,6 +100278,19 @@ ${divider}`);
         httpsServer.listen(Number(PORT), bindHost, async () => {
           await printBanner("https", extraLines);
         });
+        httpsServer.on("error", (error) => {
+          if (error.code === "EACCES") {
+            console.error(`
+\u274C ERROR: Port ${PORT} requires elevated privileges or is blocked.`);
+            console.error(`   Please try running the terminal as Administrator or use a different port.`);
+          } else if (error.code === "EADDRINUSE") {
+            console.error(`
+\u274C ERROR: Port ${PORT} is already in use.`);
+          } else {
+            console.error("\n\u274C Server error:", error);
+          }
+          process.exit(1);
+        });
         server = httpsServer;
       } else {
         console.warn("\u26A0\uFE0F HTTPS \uCD08\uAE30\uD654\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. HTTP\uB85C \uD3F4\uBC31\uD569\uB2C8\uB2E4.");
@@ -98817,8 +100302,15 @@ ${divider}`);
     server.setTimeout?.(6e4);
     server.keepAliveTimeout = 65e3;
     server.headersTimeout = 66e3;
-    const shutdown = async () => {
-      console.log("\n\u{1F6D1} Shutting down gracefully...");
+    let isShuttingDown = false;
+    const shutdown = async (signal) => {
+      if (isShuttingDown) {
+        console.log(`Received ${signal}, but shutdown is already in progress...`);
+        return;
+      }
+      isShuttingDown = true;
+      console.log(`
+\u{1F6D1} Received ${signal}. Shutting down gracefully...`);
       try {
         const { FileWatcherService } = await Promise.resolve().then(() => __importStar(require_fileWatcherService()));
         await FileWatcherService.stopAll();
@@ -98888,17 +100380,27 @@ ${divider}`);
       } catch (error) {
         console.warn("\u26A0\uFE0F  Error closing API generation database:", error);
       }
-      server.close(() => {
-        console.log("\u2705 Server closed");
+      if (server) {
+        try {
+          server.close(() => {
+            console.log("\u2705 Server closed");
+            process.exit(0);
+          });
+        } catch (error) {
+          console.error("\u26A0\uFE0F  Error closing server:", error);
+          process.exit(1);
+        }
+      } else {
+        console.log("\u2705 Server was not running or already closed");
         process.exit(0);
-      });
+      }
       setTimeout(() => {
         console.error("\u274C Forced shutdown after timeout");
         process.exit(1);
       }, 1e4);
     };
-    process.on("SIGTERM", shutdown);
-    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+    process.on("SIGINT", () => shutdown("SIGINT"));
   } catch (error) {
     console.error("\u274C Failed to start server:", error);
     process.exit(1);

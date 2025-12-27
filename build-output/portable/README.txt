@@ -81,7 +81,7 @@ To access from other devices on your network:
 
 For external internet access:
 - See the full deployment guide in DEPLOYMENT_GUIDE.md (if included)
-- Configure port forwarding on your router (port 1566)
+- Configure port forwarding on your router (port 1666)
 
 ## 📁 Data Storage
 
@@ -99,7 +99,7 @@ All data is stored in these folders (created automatically):
 Change PORT in `.env` file
 
 ### Server won't start
-- Check if port 1566 is available
+- Check if port 1666 is available
 - Check logs/ folder for error messages
 - Ensure all files are present (app/, node.exe/node)
 
@@ -194,4 +194,4 @@ This approach allows:
 **Version:** 1.0.0
 **Platform:** win32 x64
 **Node.js:** v22.20.0
-**Built:** 2025-11-23T10:48:58.715Z
+**Built:** 2025-12-27T11:11:01.152Z

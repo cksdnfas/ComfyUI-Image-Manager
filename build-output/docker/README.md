@@ -1,26 +1,65 @@
 # ComfyUI Image Manager - Docker Deployment
 
-## 🚀 Quick Start
+## 🚀 Fast Build Strategy (Base Image)
 
-### Using Docker Compose (Recommended)
+I have implemented the **Base Image Strategy** to optimize your Docker build process. This splits the monolithic build into two parts: a heavy "Base Image" (rarely changes) and a light "App Image" (changes often).
 
+### Architecture Changes
+
+#### 1. Base Image (`Dockerfile.base` / `.base.gpu`)
+This image contains:
+- Debian OS dependencies (ffmpeg, python3, build-essential)
+- Node.js environment
+- **Python Virtual Environment with PyTorch** (The heavy part)
+
+You build this once. It takes time, but you don't do it often.
+
+#### 2. App Image (`Dockerfile`)
+This image contains:
+- Your Application Code (`bundle.js`, `frontend/`, `python/scripts`)
+- `FROM comfyui-manager-base`
+
+This builds in **seconds** because it just copies your code on top of the pre-built environment.
+
+## How to Use
+
+### Step 1: Build the Base Image (First time only)
+
+**For Standard (CPU):**
 ```bash
-# Build and start
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop
-docker-compose down
+docker build -t comfyui-manager-base:cpu -f Dockerfile.base .
 ```
 
-Access the application at: **http://localhost:1566**
+**For NVIDIA GPU:**
+```bash
+docker build -t comfyui-manager-base:gpu -f Dockerfile.base.gpu .
+```
+
+### Step 2: Build/Run the App
+
+**Standard (CPU):**
+```bash
+docker-compose up -d --build
+```
+*Build time: ~5 seconds* because it reuses `comfyui-manager-base:cpu`.
+
+**With GPU:**
+Edit `docker-compose.yml`:
+```yaml
+build:
+  args:
+    BASE_IMAGE: comfyui-manager-base:gpu  # <--- Change this
+```
+
+Then run:
+```bash
+docker-compose up -d --build
+```
+
 
 ## 📦 Image Details
 
-- **Base Image**: node:20-slim (Debian-based for PyTorch compatibility)
-- **Estimated Size**: ~1.5-2GB (includes FFmpeg and PyTorch)
+- **Base Image**: Custom Base (Debian-based)
 - **Platform**: linux/amd64, linux/arm64
 - **User**: Non-root (uid 1001)
 
@@ -82,7 +121,7 @@ Available environment variables (set in `docker-compose.yml`):
 ```yaml
 environment:
   - NODE_ENV=production       # Environment mode
-  - PORT=1566                 # Internal container port (don't change)
+  - PORT=1666                 # Internal container port (don't change)
   - HOST=0.0.0.0             # Listen address
   - LOCALE=en                # Interface language (en, ko)
 
@@ -97,11 +136,11 @@ environment:
 
 ### Port Configuration
 
-To change the host port (default 1566):
+To change the host port (default 1666):
 
 ```yaml
 ports:
-  - "8080:1566"  # Access via http://localhost:8080
+  - "8080:1666"  # Access via http://localhost:8080
 ```
 
 ## 🎥 Features
@@ -109,12 +148,24 @@ ports:
 - ✅ Image processing (Sharp)
 - ✅ Video processing (FFmpeg)
 - ✅ SQLite database
-- ✅ WD v3 Tagger (Python + PyTorch CPU)
+- ✅ WD v3 Tagger (Python + PyTorch)
+- ✅ **GPU Acceleration support** (NVIDIA CUDA)
 - ✅ Health checks
 - ✅ Auto-restart
 - ✅ Persistent data storage
 
 ## 🐛 Troubleshooting
+
+### GPU (CUDA) not available
+
+If you've built the GPU image but still see "CUDA is not available":
+
+1.  **Check Hardware**: Do you have an NVIDIA GPU?
+2.  **Check Host Drivers**: Install latest NVIDIA drivers on your host machine.
+3.  **Check NVIDIA Container Toolkit**: You **MUST** install this on the host to expose GPU to containers. 
+    - [Installation Guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+4.  **WSL2 Users**: Ensure you have latest Windows NVIDIA drivers and [support for WSL2](https://docs.nvidia.com/cuda/wsl-user-guide/index.html).
+5.  **Docker Compose**: Ensure the `deploy` section in `docker-compose.yml` is uncommented.
 
 ### Container won't start
 
@@ -131,7 +182,7 @@ docker logs comfyui-image-manager
 ```yaml
 # In docker-compose.yml
 ports:
-  - "8080:1566"  # Use port 8080 instead of 1566
+  - "8080:1666"  # Use port 8080 instead of 1666
 ```
 
 ### Permission denied (bind mounts)
@@ -230,7 +281,7 @@ docker build -t comfyui-image-manager .
 # Run with named volume
 docker run -d \
   --name comfyui-manager \
-  -p 1566:1566 \
+  -p 1666:1666 \
   -v comfyui-data:/app/data \
   --restart unless-stopped \
   comfyui-image-manager
@@ -238,7 +289,7 @@ docker run -d \
 # Run with bind mount
 docker run -d \
   --name comfyui-manager \
-  -p 1566:1566 \
+  -p 1666:1666 \
   -v /path/to/data:/app/data \
   --restart unless-stopped \
   comfyui-image-manager
@@ -275,6 +326,6 @@ services:
 
 ---
 
-**Build Date**: 2025-11-23T10:48:59.089Z
+**Build Date**: 2025-12-27T11:11:01.575Z
 **Version**: 1.0.0
 **Docker Image**: comfyui-image-manager:latest

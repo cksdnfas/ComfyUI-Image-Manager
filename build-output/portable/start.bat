@@ -36,7 +36,7 @@ if errorlevel 1 (
     echo  ERROR: Server failed to start
     echo.
     echo  Please check:
-    echo  - Port 1566 is not in use
+    echo  - Port 1666 is not in use
     echo  - All files are present
     echo  - Check logs folder for errors
     echo ========================================================================

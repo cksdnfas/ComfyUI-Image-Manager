@@ -1,0 +1,58 @@
+# ComfyUI Image Manager - Base Image (CPU)
+# Contains all system dependencies, Node.js, and Python environment.
+# Build this once: docker build -t comfyui-manager-base:cpu -f Dockerfile.base .
+
+FROM node:20-slim AS deps
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY package.json ./
+
+# Install Node dependencies
+RUN npm install --production --no-package-lock && \
+    npm rebuild sharp better-sqlite3 argon2 blake2
+
+# ============================================================================
+# Runtime Stage
+# ============================================================================
+FROM node:20-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    python3 \
+    python3-pip \
+    python3-venv \
+    && ln -sf /usr/bin/python3 /usr/bin/python \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy Node modules
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy Python requirements
+COPY python/requirements.txt ./python/requirements.txt
+
+# Install Python dependencies (CPU)
+RUN pip3 install --no-cache-dir \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    -r python/requirements.txt && \
+    find /usr/local/lib/python3* -name '*.pyc' -delete && \
+    find /usr/local/lib/python3* -name '__pycache__' -delete && \
+    rm -rf /root/.cache/pip
+
+# Create data directories
+RUN mkdir -p /app/data/uploads /app/data/database /app/data/logs /app/data/temp /app/data/models /app/data/config /app/data/RecycleBin
+
+# Create non-root user
+RUN groupadd -g 1001 appuser && \
+    useradd -u 1001 -g appuser -s /bin/bash -m appuser && \
+    chown -R appuser:appuser /app
