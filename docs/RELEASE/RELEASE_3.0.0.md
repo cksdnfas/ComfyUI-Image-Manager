@@ -32,7 +32,7 @@ AI 클라이언트(Claude Code, OpenClo 등)에서 이미지 매니저의 기능
 | | `search_custom_dropdown_items` | 드롭다운 항목 검색 |
 | | `search_wildcards` | 와일드카드 검색 (계층 구조 지원) |
 
-- 설정 가이드: [MCP_GUIDE.md](../GUIDE/MCP_GUIDE.md)
+- 설정 가이드: [MCP_GUIDE.md](https://github.com/cksdnfas/ComfyUI-Image-Manager/blob/master/docs/GUIDE/MCP_GUIDE.md)
 
 ---
 
