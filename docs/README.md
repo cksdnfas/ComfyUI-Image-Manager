@@ -1,4 +1,4 @@
-# ComfyUI Image Manager v2.0.2
+# ComfyUI Image Manager v3.0.0
 
 AI Image Management and Analysis System for ComfyUI
 
@@ -11,6 +11,13 @@ ComfyUI Image Manager is a comprehensive system for managing, analyzing, and org
 https://github.com/user-attachments/assets/9b2efdc7-b2bb-42a6-9e85-679cab2ce2d5
 
 ## Major Features
+
+### MCP (Model Context Protocol) Server Integration
+- Built-in MCP server for AI client integration (Claude Code, OpenClaw, etc.)
+- 13 MCP tools for prompt search, image generation, and metadata access
+- Supports both Streamable HTTP and stdio modes
+- Direct integration with ComfyUI and NovelAI workflows
+- See [MCP Guide](GUIDE/MCP_GUIDE.md) for detailed setup and usage
 
 ### External Folder Support
 - Watch and manage folders from anywhere on your system
@@ -82,9 +89,15 @@ The portable version includes:
 - Session-based authentication
 - Rate limiting enabled
 
-## Release Notes
+## Documentation
+
+### Guides
+- [MCP (Model Context Protocol) Setup Guide](GUIDE/MCP_GUIDE.md)
+
+### Release Notes
 
 For detailed release notes and changes, see:
+- [v3.0.0 Release Notes](RELEASE/RELEASE_3.0.0.md)
 - [v2.0.2 Release Notes](RELEASE/RELEASE_2.0.2.md)
 - [v2.0.1a Release Notes](RELEASE/RELEASE_2.0.1a.md)
 - [v2.0.0a Release Notes](RELEASE/RELEASE_2.0.0a.md)
@@ -101,5 +114,5 @@ Personal Project
 ---
 
 **Author**: cksdnfas
-**Version**: 2.0.2
+**Version**: 3.0.0
 **Repository**: https://github.com/cksdnfas/ComfyUI-Image-Manager
